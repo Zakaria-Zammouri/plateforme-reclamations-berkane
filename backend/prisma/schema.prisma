@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  nom          String
+  email        String        @unique
+  password     String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  role         String        @default("CITOYEN")
+  reclamations Reclamation[]
+}
+
+model Reclamation {
+  id                Int            @id @default(autoincrement())
+  numeroClassement  Int            @unique
+  numeroBureauOrdre String?
+  dateBureauOrdre   DateTime?
+  dateReception     DateTime?
+  departement       String?
+  service           String?
+  misEnCause        String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  userId            Int?
+  statut            String         @default("EN_ATTENTE")
+  description       String         @default("Sans description")
+  titre             String         @default("Sans titre")
+  fichiers          FichierJoint[]
+  user              User?          @relation(fields: [userId], references: [id])
+}
+
+model FichierJoint {
+  id            Int         @id @default(autoincrement())
+  nomFichier    String
+  chemin        String
+  typeMime      String?
+  taille        Int?
+  createdAt     DateTime    @default(now())
+  reclamationId Int
+  reclamation   Reclamation @relation(fields: [reclamationId], references: [id], onDelete: Cascade)
+}
