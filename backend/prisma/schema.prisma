@@ -35,14 +35,22 @@ model Reclamation {
   userId            Int?
   statut            String                  @default("EN_ATTENTE")
   priorite          String                  @default("NORMALE")
+
+  categorieIA       String?
+  departementIA     String?
+  serviceIA         String?
+  prioriteIA        String?
+  confianceIA       Float?
+  analyseIAAt       DateTime?
+
   description       String                  @default("Sans description")
   titre             String                  @default("Sans titre")
+
   fichiers          FichierJoint[]
   historiques       HistoriqueReclamation[]
   notifications     Notification[]
   user              User?                   @relation(fields: [userId], references: [id])
 }
-
 model FichierJoint {
   id            Int         @id @default(autoincrement())
   nomFichier    String

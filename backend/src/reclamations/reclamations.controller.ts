@@ -117,7 +117,7 @@ export class ReclamationsController {
 
   @Post()
   @ApiOperation({
-    summary: 'Créer une réclamation',
+    summary: 'Créer une réclamation avec analyse IA',
   })
   @UseGuards(
     JwtAuthGuard,

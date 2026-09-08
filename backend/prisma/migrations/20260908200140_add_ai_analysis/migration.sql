@@ -1,0 +1,24 @@
+BEGIN TRY
+
+BEGIN TRAN;
+
+-- AlterTable
+ALTER TABLE [dbo].[Reclamation] ADD [analyseIAAt] DATETIME2,
+[categorieIA] NVARCHAR(1000),
+[confianceIA] FLOAT(53),
+[departementIA] NVARCHAR(1000),
+[prioriteIA] NVARCHAR(1000),
+[serviceIA] NVARCHAR(1000);
+
+COMMIT TRAN;
+
+END TRY
+BEGIN CATCH
+
+IF @@TRANCOUNT > 0
+BEGIN
+    ROLLBACK TRAN;
+END;
+THROW
+
+END CATCH

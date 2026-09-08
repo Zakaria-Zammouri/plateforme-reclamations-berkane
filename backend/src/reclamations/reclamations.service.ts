@@ -10,12 +10,194 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { CreateReclamationDto } from './dto/create-reclamation.dto'
 import { UpdateReclamationDto } from './dto/update-reclamation.dto'
 
+type AnalyseIA = {
+  categorie: string
+  departement: string
+  service: string
+  priorite: 'BASSE' | 'NORMALE' | 'HAUTE' | 'URGENTE'
+  confiance: number
+}
+
 @Injectable()
 export class ReclamationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  // =========================================
+  // IA
+  // Analyse automatique d'une réclamation
+  // =========================================
+
+  private async analyserAvecIA(
+    titre: string,
+    description: string,
+  ): Promise<AnalyseIA | null> {
+    const aiServiceUrl =
+      process.env.AI_SERVICE_URL?.trim() ||
+      'http://127.0.0.1:8000'
+
+    console.log('======================================')
+    console.log('🤖 APPEL MICROSERVICE IA')
+    console.log('URL IA :', aiServiceUrl)
+    console.log('Titre :', titre)
+
+    try {
+      const response = await fetch(
+        `${aiServiceUrl}/analyze`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            titre,
+            description,
+          }),
+          signal: AbortSignal.timeout(120000),
+        },
+      )
+
+      console.log(
+        '📡 Réponse HTTP IA :',
+        response.status,
+      )
+
+      if (!response.ok) {
+        const errorText =
+          await response.text()
+
+        console.error(
+          '❌ Erreur HTTP du microservice IA :',
+          errorText,
+        )
+
+        console.log('======================================')
+
+        return null
+      }
+
+      const rawData =
+        await response.text()
+
+      console.log(
+        '📦 Réponse brute IA :',
+        rawData,
+      )
+
+      let data: AnalyseIA
+
+      try {
+        data =
+          JSON.parse(rawData) as AnalyseIA
+      } catch {
+        console.error(
+          '❌ Réponse IA non JSON.',
+        )
+
+        console.log('======================================')
+
+        return null
+      }
+
+      console.log(
+        '✅ Analyse IA reçue :',
+        data,
+      )
+
+      if (
+        !data ||
+        typeof data.categorie !==
+          'string' ||
+        typeof data.departement !==
+          'string' ||
+        typeof data.service !==
+          'string' ||
+        typeof data.priorite !==
+          'string'
+      ) {
+        console.error(
+          '❌ Réponse IA invalide.',
+        )
+
+        console.log('======================================')
+
+        return null
+      }
+
+      const prioritesAutorisees = [
+        'BASSE',
+        'NORMALE',
+        'HAUTE',
+        'URGENTE',
+      ] as const
+
+      if (
+        !prioritesAutorisees.includes(
+          data.priorite,
+        )
+      ) {
+        console.error(
+          '❌ Priorité IA invalide :',
+          data.priorite,
+        )
+
+        console.log('======================================')
+
+        return null
+      }
+
+      const confiance =
+        typeof data.confiance ===
+          'number' &&
+        Number.isFinite(data.confiance)
+          ? Math.min(
+              1,
+              Math.max(
+                0,
+                data.confiance,
+              ),
+            )
+          : 0
+
+      const resultat: AnalyseIA = {
+        categorie:
+          data.categorie.trim() ||
+          'AUTRE',
+
+        departement:
+          data.departement.trim(),
+
+        service:
+          data.service.trim(),
+
+        priorite:
+          data.priorite,
+
+        confiance,
+      }
+
+      console.log(
+        '✅ ANALYSE IA VALIDÉE :',
+        resultat,
+      )
+
+      console.log('======================================')
+
+      return resultat
+    } catch (error) {
+      console.error(
+        '❌ IMPOSSIBLE DE CONTACTER LE MICROSERVICE IA',
+      )
+
+      console.error(error)
+
+      console.log('======================================')
+
+      return null
+    }
+  }
 
   // =========================================
   // ADMIN / AGENT
@@ -135,17 +317,22 @@ export class ReclamationsService {
 
         total: item._count._all,
       }))
-      .sort((a, b) => b.total - a.total)
+      .sort(
+        (a, b) => b.total - a.total,
+      )
 
-    const parDepartement = parDepartementBrut
-      .map((item) => ({
-        departement:
-          item.departement?.trim() ||
-          'Non renseigné',
+    const parDepartement =
+      parDepartementBrut
+        .map((item) => ({
+          departement:
+            item.departement?.trim() ||
+            'Non renseigné',
 
-        total: item._count._all,
-      }))
-      .sort((a, b) => b.total - a.total)
+          total: item._count._all,
+        }))
+        .sort(
+          (a, b) => b.total - a.total,
+        )
 
     const prioritesAutorisees = [
       'BASSE',
@@ -161,13 +348,16 @@ export class ReclamationsService {
       ]),
     )
 
-    const parPriorite = prioritesAutorisees.map(
-      (priorite) => ({
-        priorite,
-        total:
-          parPrioriteMap.get(priorite) ?? 0,
-      }),
-    )
+    const parPriorite =
+      prioritesAutorisees.map(
+        (priorite) => ({
+          priorite,
+          total:
+            parPrioriteMap.get(
+              priorite,
+            ) ?? 0,
+        }),
+      )
 
     return {
       total,
@@ -250,9 +440,11 @@ export class ReclamationsService {
     }
 
     if (
-      !['CITOYEN', 'AGENT', 'ADMIN'].includes(
-        roleEffectif,
-      )
+      ![
+        'CITOYEN',
+        'AGENT',
+        'ADMIN',
+      ].includes(roleEffectif)
     ) {
       throw new ForbiddenException(
         'Accès refusé.',
@@ -310,6 +502,45 @@ export class ReclamationsService {
     dto: CreateReclamationDto,
     userId: number,
   ) {
+    // =======================================
+    // Analyse automatique IA
+    // =======================================
+
+    const analyseIA =
+      await this.analyserAvecIA(
+        dto.titre,
+        dto.description,
+      )
+
+    console.log(
+      '🤖 Résultat analyse IA pour création :',
+      analyseIA,
+    )
+
+    // =======================================
+    // Valeurs finales
+    // L'IA est prioritaire lorsqu'elle répond
+    // =======================================
+
+    const prioriteFinale =
+      analyseIA?.priorite ||
+      dto.priorite ||
+      'NORMALE'
+
+    const departementFinal =
+      analyseIA?.departement ||
+      dto.departement ||
+      null
+
+    const serviceFinal =
+      analyseIA?.service ||
+      dto.service ||
+      null
+
+    // =======================================
+    // Numéro de classement
+    // =======================================
+
     const last =
       await this.prisma.reclamation.findFirst({
         orderBy: {
@@ -321,6 +552,10 @@ export class ReclamationsService {
       last
         ? last.numeroClassement + 1
         : 1
+
+    // =======================================
+    // Création de la réclamation
+    // =======================================
 
     const reclamation =
       await this.prisma.reclamation.create({
@@ -334,7 +569,40 @@ export class ReclamationsService {
             dto.description,
 
           priorite:
-            dto.priorite || 'NORMALE',
+            prioriteFinale,
+
+          // ===================================
+          // Résultats IA
+          // ===================================
+
+          categorieIA:
+            analyseIA?.categorie ??
+            null,
+
+          departementIA:
+            analyseIA?.departement ??
+            null,
+
+          serviceIA:
+            analyseIA?.service ??
+            null,
+
+          prioriteIA:
+            analyseIA?.priorite ??
+            null,
+
+          confianceIA:
+            analyseIA?.confiance ??
+            null,
+
+          analyseIAAt:
+            analyseIA
+              ? new Date()
+              : null,
+
+          // ===================================
+          // Autres informations
+          // ===================================
 
           numeroBureauOrdre:
             dto.numeroBureauOrdre,
@@ -354,10 +622,10 @@ export class ReclamationsService {
               : null,
 
           departement:
-            dto.departement,
+            departementFinal,
 
           service:
-            dto.service,
+            serviceFinal,
 
           misEnCause:
             dto.misEnCause,
@@ -366,7 +634,33 @@ export class ReclamationsService {
         },
       })
 
-    // Première entrée dans l'historique
+    console.log(
+      '✅ Réclamation créée avec analyse IA :',
+      {
+        id: reclamation.id,
+        numeroClassement:
+          reclamation.numeroClassement,
+        priorite:
+          reclamation.priorite,
+        categorieIA:
+          reclamation.categorieIA,
+        departementIA:
+          reclamation.departementIA,
+        serviceIA:
+          reclamation.serviceIA,
+        prioriteIA:
+          reclamation.prioriteIA,
+        confianceIA:
+          reclamation.confianceIA,
+        analyseIAAt:
+          reclamation.analyseIAAt,
+      },
+    )
+
+    // =======================================
+    // Historique initial
+    // =======================================
+
     await this.prisma.historiqueReclamation.create({
       data: {
         reclamationId:
@@ -382,7 +676,10 @@ export class ReclamationsService {
       },
     })
 
-    // Notification au citoyen
+    // =======================================
+    // Notification citoyen
+    // =======================================
+
     await this.notificationsService.create(
       userId,
 
@@ -507,7 +804,6 @@ export class ReclamationsService {
         },
       })
 
-    // Enregistrer le changement
     await this.prisma.historiqueReclamation.create({
       data: {
         reclamationId:
@@ -522,7 +818,6 @@ export class ReclamationsService {
       },
     })
 
-    // Notification au citoyen propriétaire
     if (reclamation.userId) {
       let titreNotification =
         'Mise à jour de votre réclamation'
