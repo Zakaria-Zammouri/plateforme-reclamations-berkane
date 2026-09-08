@@ -1,62 +1,73 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common'
 
-import { PassportStrategy } from '@nestjs/passport';
+import { PassportStrategy } from '@nestjs/passport'
+import {
+  ExtractJwt,
+  Strategy,
+} from 'passport-jwt'
 
-import { ExtractJwt, Strategy } from 'passport-jwt';
-
-
+import { PrismaService } from '../../../prisma/prisma.service'
 
 @Injectable()
+export class JwtStrategy extends PassportStrategy(
+  Strategy,
+) {
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {
+    const jwtSecret =
+      process.env.JWT_SECRET
 
-export class JwtStrategy 
-extends PassportStrategy(Strategy){
+    if (!jwtSecret) {
+      throw new Error(
+        'JWT_SECRET est obligatoire dans le fichier .env',
+      )
+    }
 
+    super({
+      jwtFromRequest:
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
 
-constructor(){
+      ignoreExpiration: false,
 
-super({
+      secretOrKey: jwtSecret,
+    })
+  }
 
-jwtFromRequest:
-ExtractJwt.fromAuthHeaderAsBearerToken(),
+  async validate(payload: any) {
+    const user =
+      await this.prisma.user.findUnique({
+        where: {
+          id: payload.sub,
+        },
 
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          actif: true,
+        },
+      })
 
-ignoreExpiration:false,
+    if (!user) {
+      throw new UnauthorizedException(
+        'Utilisateur introuvable.',
+      )
+    }
 
+    if (!user.actif) {
+      throw new UnauthorizedException(
+        'Votre compte est désactivé. Contactez l’administrateur.',
+      )
+    }
 
-secretOrKey:'secret-dev',
-
-
-});
-
-
-}
-
-
-
-
-async validate(payload:any){
-
-
-return {
-
-
-userId:
-payload.sub,
-
-
-email:
-payload.email,
-
-
-role:
-payload.role,
-
-
-};
-
-
-}
-
-
-
+    return {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    }
+  }
 }

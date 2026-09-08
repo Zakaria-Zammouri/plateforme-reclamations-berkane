@@ -1,23 +1,20 @@
-import { Module } from '@nestjs/common';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
+import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
 
-import { ReclamationsModule } from './reclamations/reclamations.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { AuthModule } from './auth/auth.module';
-import { FichiersModule } from './fichiers/fichiers.module';
-import { UsersModule } from './users/users.module';
-
+import { ReclamationsModule } from './reclamations/reclamations.module'
+import { PrismaModule } from './prisma/prisma.module'
+import { AuthModule } from './auth/auth.module'
+import { FichiersModule } from './fichiers/fichiers.module'
+import { UsersModule } from './users/users.module'
+import { NotificationsModule } from './notifications/notifications.module'
 
 @Module({
   imports: [
-
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
+    ConfigModule.forRoot({
+      isGlobal: true,
     }),
 
     PrismaModule,
@@ -29,7 +26,6 @@ import { UsersModule } from './users/users.module';
     FichiersModule,
 
     UsersModule,
-
   ],
 
   controllers: [

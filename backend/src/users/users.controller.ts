@@ -1,33 +1,31 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
-  Delete,
-  Body,
   UseGuards,
-} from '@nestjs/common';
+} from '@nestjs/common'
 
-import { UsersService } from './users.service';
+import { UsersService } from './users.service'
 
-import { JwtAuthGuard } from '../auth/guards/jwt-auth/jwt-auth.guard';
-import { RolesGuard } from '../guards/roles/roles.guard';
-import { Roles } from '../roles/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth/jwt-auth.guard'
+import { RolesGuard } from '../guards/roles/roles.guard'
+import { Roles } from '../roles/roles.decorator'
 
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-
+import {
+  ApiBearerAuth,
+  ApiTags,
+} from '@nestjs/swagger'
 
 @ApiTags('Users')
 @ApiBearerAuth()
 @Controller('users')
 export class UsersController {
-
-
   constructor(
     private readonly usersService: UsersService,
-  ){}
-
-
+  ) {}
 
   @Get()
   @UseGuards(
@@ -35,14 +33,9 @@ export class UsersController {
     RolesGuard,
   )
   @Roles('ADMIN')
-  getAll(){
-
-    return this.usersService.getAll();
-
+  getAll() {
+    return this.usersService.getAll()
   }
-
-
-
 
   @Get(':id')
   @UseGuards(
@@ -51,18 +44,12 @@ export class UsersController {
   )
   @Roles('ADMIN')
   getOne(
-    @Param('id') id:string,
-  ){
-
+    @Param('id') id: string,
+  ) {
     return this.usersService.getOne(
-      Number(id)
-    );
-
+      Number(id),
+    )
   }
-
-
-
-
 
   @Patch(':id')
   @UseGuards(
@@ -71,23 +58,19 @@ export class UsersController {
   )
   @Roles('ADMIN')
   update(
-
-    @Param('id') id:string,
-
-    @Body() body:any,
-
-  ){
-
+    @Param('id') id: string,
+    @Body()
+    body: {
+      nom?: string
+      role?: string
+      actif?: boolean
+    },
+  ) {
     return this.usersService.update(
       Number(id),
       body,
-    );
-
+    )
   }
-
-
-
-
 
   @Delete(':id')
   @UseGuards(
@@ -96,16 +79,10 @@ export class UsersController {
   )
   @Roles('ADMIN')
   delete(
-
-    @Param('id') id:string,
-
-  ){
-
+    @Param('id') id: string,
+  ) {
     return this.usersService.delete(
-      Number(id)
-    );
-
+      Number(id),
+    )
   }
-
-
 }

@@ -8,33 +8,39 @@ datasource db {
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
-  nom          String
-  email        String        @unique
-  password     String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  role         String        @default("CITOYEN")
-  reclamations Reclamation[]
+  id                     Int                     @id @default(autoincrement())
+  nom                    String
+  email                  String                  @unique
+  password               String
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  role                   String                  @default("CITOYEN")
+  actif                  Boolean                 @default(true)
+  historiquesReclamation HistoriqueReclamation[]
+  reclamations           Reclamation[]
+  notifications           Notification[]
 }
 
 model Reclamation {
-  id                Int            @id @default(autoincrement())
-  numeroClassement  Int            @unique
+  id                Int                     @id @default(autoincrement())
+  numeroClassement  Int                     @unique
   numeroBureauOrdre String?
   dateBureauOrdre   DateTime?
   dateReception     DateTime?
   departement       String?
   service           String?
   misEnCause        String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
   userId            Int?
-  statut            String         @default("EN_ATTENTE")
-  description       String         @default("Sans description")
-  titre             String         @default("Sans titre")
+  statut            String                  @default("EN_ATTENTE")
+  priorite          String                  @default("NORMALE")
+  description       String                  @default("Sans description")
+  titre             String                  @default("Sans titre")
   fichiers          FichierJoint[]
-  user              User?          @relation(fields: [userId], references: [id])
+  historiques       HistoriqueReclamation[]
+  notifications     Notification[]
+  user              User?                   @relation(fields: [userId], references: [id])
 }
 
 model FichierJoint {
@@ -46,4 +52,29 @@ model FichierJoint {
   createdAt     DateTime    @default(now())
   reclamationId Int
   reclamation   Reclamation @relation(fields: [reclamationId], references: [id], onDelete: Cascade)
+}
+
+model HistoriqueReclamation {
+  id            Int         @id @default(autoincrement())
+  reclamationId Int
+  userId        Int?
+  ancienStatut  String?
+  nouveauStatut String
+  createdAt     DateTime    @default(now())
+  reclamation   Reclamation @relation(fields: [reclamationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user          User?       @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Notification {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  reclamationId Int?
+  titre         String
+  message       String
+  type          String   @default("INFO")
+  lu            Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reclamation   Reclamation? @relation(fields: [reclamationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

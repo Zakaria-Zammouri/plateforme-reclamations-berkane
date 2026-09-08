@@ -1,29 +1,32 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
+} from '@nestjs/common'
 
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service'
 
+const ROLES_AUTORISES = [
+  'CITOYEN',
+  'AGENT',
+  'ADMIN',
+] as const
 
 @Injectable()
 export class UsersService {
-
   constructor(
     private readonly prisma: PrismaService,
   ) {}
 
-
   // Tous les utilisateurs
   async getAll() {
-
     return this.prisma.user.findMany({
-
       select: {
         id: true,
         nom: true,
         email: true,
         role: true,
+        actif: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -31,129 +34,140 @@ export class UsersService {
       orderBy: {
         createdAt: 'desc',
       },
-
-    });
-
+    })
   }
-
-
 
   // Un utilisateur
-  async getOne(id:number) {
+  async getOne(id: number) {
+    const user =
+      await this.prisma.user.findUnique({
+        where: {
+          id,
+        },
 
-    const user = await this.prisma.user.findUnique({
+        select: {
+          id: true,
+          nom: true,
+          email: true,
+          role: true,
+          actif: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
 
-      where:{
-        id,
-      },
-
-      select:{
-        id:true,
-        nom:true,
-        email:true,
-        role:true,
-        createdAt:true,
-        updatedAt:true,
-      },
-
-    });
-
-
-    if(!user){
-
+    if (!user) {
       throw new NotFoundException(
-        'Utilisateur introuvable'
-      );
-
+        'Utilisateur introuvable',
+      )
     }
 
-
-    return user;
-
+    return user
   }
-
-
-
 
   // Modifier utilisateur
   async update(
-    id:number,
-    data:any,
-  ){
+    id: number,
+    data: {
+      nom?: string
+      role?: string
+      actif?: boolean
+    },
+  ) {
+    const user =
+      await this.prisma.user.findUnique({
+        where: {
+          id,
+        },
+      })
 
-    const user = await this.prisma.user.findUnique({
-
-      where:{
-        id,
-      }
-
-    });
-
-
-    if(!user){
-
+    if (!user) {
       throw new NotFoundException(
-        'Utilisateur introuvable'
-      );
-
+        'Utilisateur introuvable',
+      )
     }
 
+    if (
+      data.role !== undefined &&
+      !ROLES_AUTORISES.includes(
+        data.role as (typeof ROLES_AUTORISES)[number],
+      )
+    ) {
+      throw new BadRequestException(
+        'Rôle invalide. Les rôles autorisés sont : CITOYEN, AGENT et ADMIN.',
+      )
+    }
+
+    if (
+      data.actif !== undefined &&
+      typeof data.actif !== 'boolean'
+    ) {
+      throw new BadRequestException(
+        'La valeur actif doit être un booléen.',
+      )
+    }
 
     return this.prisma.user.update({
-
-      where:{
+      where: {
         id,
       },
 
-      data:{
-        nom:data.nom,
-        role:data.role,
+      data: {
+        ...(data.nom !== undefined && {
+          nom: data.nom,
+        }),
+
+        ...(data.role !== undefined && {
+          role: data.role,
+        }),
+
+        ...(data.actif !== undefined && {
+          actif: data.actif,
+        }),
       },
 
-      select:{
-        id:true,
-        nom:true,
-        email:true,
-        role:true,
+      select: {
+        id: true,
+        nom: true,
+        email: true,
+        role: true,
+        actif: true,
       },
-
-    });
-
+    })
   }
-
-
-
 
   // Supprimer utilisateur
-  async delete(id:number){
+  async delete(id: number) {
+    const user =
+      await this.prisma.user.findUnique({
+        where: {
+          id,
+        },
+      })
 
-    const user = await this.prisma.user.findUnique({
-
-      where:{
-        id,
-      }
-
-    });
-
-
-    if(!user){
-
+    if (!user) {
       throw new NotFoundException(
-        'Utilisateur introuvable'
-      );
-
+        'Utilisateur introuvable',
+      )
     }
 
+    const historiqueCount =
+      await this.prisma.historiqueReclamation.count({
+        where: {
+          userId: id,
+        },
+      })
+
+    if (historiqueCount > 0) {
+      throw new BadRequestException(
+        'Impossible de supprimer cet utilisateur car il est référencé dans l’historique des réclamations. Désactivez plutôt son compte.',
+      )
+    }
 
     return this.prisma.user.delete({
-
-      where:{
+      where: {
         id,
       },
-
-    });
-
+    })
   }
-
-
 }
