@@ -1,4 +1,5 @@
 ﻿import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -16,6 +17,7 @@ type AnalyseIA = {
   service: string
   priorite: 'BASSE' | 'NORMALE' | 'HAUTE' | 'URGENTE'
   confiance: number
+  reponse: string
 }
 
 @Injectable()
@@ -112,14 +114,11 @@ export class ReclamationsService {
 
       if (
         !data ||
-        typeof data.categorie !==
-          'string' ||
-        typeof data.departement !==
-          'string' ||
-        typeof data.service !==
-          'string' ||
-        typeof data.priorite !==
-          'string'
+        typeof data.categorie !== 'string' ||
+        typeof data.departement !== 'string' ||
+        typeof data.service !== 'string' ||
+        typeof data.priorite !== 'string' ||
+        typeof data.reponse !== 'string'
       ) {
         console.error(
           '❌ Réponse IA invalide.',
@@ -157,8 +156,7 @@ export class ReclamationsService {
       }
 
       const confiance =
-        typeof data.confiance ===
-          'number' &&
+        typeof data.confiance === 'number' &&
         Number.isFinite(data.confiance)
           ? Math.min(
               1,
@@ -175,15 +173,21 @@ export class ReclamationsService {
           'AUTRE',
 
         departement:
-          data.departement.trim(),
+          data.departement.trim() ||
+          'AUTRE',
 
         service:
-          data.service.trim(),
+          data.service.trim() ||
+          'AUTRE',
 
         priorite:
           data.priorite,
 
         confiance,
+
+        reponse:
+          data.reponse.trim() ||
+          'Votre réclamation a bien été enregistrée et sera examinée par le service compétent.',
       }
 
       console.log(
@@ -607,6 +611,10 @@ export class ReclamationsService {
             analyseIA?.confiance ??
             null,
 
+          reponseIA:
+            analyseIA?.reponse ??
+            null,
+
           analyseIAAt:
             analyseIA
               ? new Date()
@@ -686,6 +694,9 @@ export class ReclamationsService {
         confianceIA:
           reclamation.confianceIA,
 
+        reponseIA:
+          reclamation.reponseIA,
+
         analyseIAAt:
           reclamation.analyseIAAt,
 
@@ -716,7 +727,7 @@ export class ReclamationsService {
 
         detail:
           analyseIA
-            ? 'Création de la réclamation avec analyse IA. Classification en attente de validation humaine.'
+            ? 'Création de la réclamation avec analyse IA. Classification et réponse type en attente de validation humaine.'
             : 'Création de la réclamation. Aucune analyse IA disponible.',
       },
     })
@@ -965,13 +976,16 @@ export class ReclamationsService {
           'Non renseignée'
         }.`,
         `Confiance IA : ${
-          reclamation.confianceIA !==
-          null
+          reclamation.confianceIA !== null
             ? `${Math.round(
                 reclamation.confianceIA *
                   100,
               )}%`
             : 'Non renseignée'
+        }.`,
+        `Réponse type IA : ${
+          reclamation.reponseIA ||
+          'Non disponible'
         }.`,
       ].join(' ')
 
@@ -1054,6 +1068,9 @@ export class ReclamationsService {
         confiance:
           reclamation.confianceIA,
 
+        reponse:
+          reclamation.reponseIA,
+
         analyseAt:
           reclamation.analyseIAAt,
       },
@@ -1078,6 +1095,156 @@ export class ReclamationsService {
     }
 
     return updatedReclamation
+  }
+
+  // =========================================
+  // REPONSE FINALE AU CITOYEN
+  // ADMIN / AGENT
+  // =========================================
+
+  async envoyerReponse(
+    id: number,
+    reponse: string,
+    userId: number,
+  ) {
+    const reclamation =
+      await this.prisma.reclamation.findUnique({
+        where: {
+          id,
+        },
+      })
+
+    if (!reclamation) {
+      throw new NotFoundException(
+        'Réclamation introuvable.',
+      )
+    }
+
+    // =======================================
+    // Vérification du citoyen destinataire
+    // =======================================
+
+    if (!reclamation.userId) {
+      throw new BadRequestException(
+        'Cette réclamation n’est associée à aucun citoyen.',
+      )
+    }
+
+    // =======================================
+    // Vérification de la réponse
+    // =======================================
+
+    const reponseNettoyee =
+      typeof reponse === 'string'
+        ? reponse.trim()
+        : ''
+
+    if (!reponseNettoyee) {
+      throw new BadRequestException(
+        'La réponse ne peut pas être vide.',
+      )
+    }
+
+    // =======================================
+    // Empêcher un second envoi accidentel
+    // =======================================
+
+    if (reclamation.reponseFinale) {
+      throw new BadRequestException(
+        'Une réponse finale a déjà été envoyée pour cette réclamation.',
+      )
+    }
+
+    // =======================================
+    // Enregistrement + historique
+    // + notification citoyen
+    // =======================================
+
+    const resultat =
+      await this.prisma.$transaction(
+        async (tx) => {
+          const reclamationMiseAJour =
+            await tx.reclamation.update({
+              where: {
+                id,
+              },
+
+              data: {
+                reponseFinale:
+                  reponseNettoyee,
+              },
+            })
+
+          await tx.historiqueReclamation.create({
+            data: {
+              reclamationId:
+                id,
+
+              userId,
+
+              ancienStatut:
+                reclamation.statut,
+
+              nouveauStatut:
+                reclamation.statut,
+
+              actionTypee:
+                'REPONSE_CITOYEN',
+
+              detail:
+                'Réponse finale préparée par un agent et envoyée au citoyen.',
+            },
+          })
+
+          await tx.notification.create({
+            data: {
+              userId:
+                reclamation.userId!,
+
+              reclamationId:
+                id,
+
+              titre:
+                'Réponse à votre réclamation',
+
+              message:
+                reponseNettoyee,
+
+              type:
+                'REPONSE',
+            },
+          })
+
+          return reclamationMiseAJour
+        },
+      )
+
+    console.log(
+      '✅ RÉPONSE FINALE ENVOYÉE AU CITOYEN',
+    )
+
+    console.log({
+      reclamationId:
+        id,
+
+      numeroClassement:
+        reclamation.numeroClassement,
+
+      userId,
+
+      citoyenId:
+        reclamation.userId,
+
+      reponse:
+        reponseNettoyee,
+    })
+
+    return {
+      message:
+        'La réponse finale a été envoyée au citoyen.',
+      reclamation:
+        resultat,
+    }
   }
 
   // =========================================

@@ -19,6 +19,7 @@ import {
 import { ReclamationsService } from './reclamations.service'
 
 import { CreateReclamationDto } from './dto/create-reclamation.dto'
+import { EnvoyerReponseDto } from './dto/envoyer-reponse.dto'
 import { UpdateReclamationDto } from './dto/update-reclamation.dto'
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth/jwt-auth.guard'
@@ -180,6 +181,33 @@ export class ReclamationsController {
     return this.reclamationsService.validerAnalyseIA(
       Number(id),
       dto,
+      req.user.userId,
+    )
+  }
+
+  // =========================================
+  // ENVOI DE LA REPONSE FINALE AU CITOYEN
+  // ADMIN / AGENT
+  // =========================================
+
+  @Post(':id/reponse')
+  @ApiOperation({
+    summary:
+      'Modifier et envoyer la réponse finale au citoyen',
+  })
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+  )
+  @Roles('ADMIN', 'AGENT')
+  envoyerReponse(
+    @Param('id') id: string,
+    @Body() dto: EnvoyerReponseDto,
+    @Req() req: any,
+  ) {
+    return this.reclamationsService.envoyerReponse(
+      Number(id),
+      dto.reponse,
       req.user.userId,
     )
   }

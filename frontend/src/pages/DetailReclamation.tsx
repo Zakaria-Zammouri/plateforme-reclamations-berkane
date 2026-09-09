@@ -56,6 +56,8 @@ type Reclamation = {
   serviceIA: string | null
   prioriteIA: string | null
   confianceIA: number | null
+  reponseIA: string | null
+  reponseFinale: string | null
   analyseIAAt: string | null
   iaValidee: boolean
 
@@ -168,6 +170,12 @@ function DetailReclamation() {
   const [selectedPriorite, setSelectedPriorite] =
     useState('')
 
+  const [responseDraft, setResponseDraft] =
+    useState('')
+
+  const [sendingResponse, setSendingResponse] =
+    useState(false)
+
   const [loading, setLoading] =
     useState(true)
 
@@ -246,6 +254,20 @@ function DetailReclamation() {
           ? data.confianceIA
           : null,
 
+      reponseIA:
+        typeof data.reponseIA ===
+          'string'
+          ? data.reponseIA.trim() ||
+            null
+          : null,
+
+      reponseFinale:
+        typeof data.reponseFinale ===
+          'string'
+          ? data.reponseFinale.trim() ||
+            null
+          : null,
+
       analyseIAAt:
         data.analyseIAAt ??
         null,
@@ -275,6 +297,12 @@ function DetailReclamation() {
       normalizedData.priorite ||
         normalizedData.prioriteIA ||
         'NORMALE',
+    )
+
+    setResponseDraft(
+      normalizedData.reponseFinale ||
+        normalizedData.reponseIA ||
+        '',
     )
   }
 
@@ -327,7 +355,8 @@ function DetailReclamation() {
             {
               method: 'GET',
               headers: {
-                Authorization: `Bearer ${token}`,
+                Authorization:
+                  `Bearer ${token}`,
               },
             },
           )
@@ -467,6 +496,9 @@ function DetailReclamation() {
       case 'STATUT':
         return 'Changement de statut'
 
+      case 'REPONSE_CITOYEN':
+        return 'Réponse au citoyen'
+
       default:
         return 'Action'
     }
@@ -485,6 +517,9 @@ function DetailReclamation() {
       case 'STATUT':
         return 'history-action history-action-status'
 
+      case 'REPONSE_CITOYEN':
+        return 'history-action history-action-response'
+
       default:
         return 'history-action'
     }
@@ -498,6 +533,13 @@ function DetailReclamation() {
       'VALIDATION_IA'
     ) {
       return 'Classification IA validée'
+    }
+
+    if (
+      historique.actionTypee ===
+      'REPONSE_CITOYEN'
+    ) {
+      return 'Réponse envoyée au citoyen'
     }
 
     if (
@@ -722,7 +764,8 @@ function DetailReclamation() {
           {
             method: 'GET',
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization:
+                `Bearer ${token}`,
             },
           },
         )
@@ -847,7 +890,8 @@ function DetailReclamation() {
             headers: {
               'Content-Type':
                 'application/json',
-              Authorization: `Bearer ${token}`,
+              Authorization:
+                `Bearer ${token}`,
             },
             body: JSON.stringify({
               statut:
@@ -883,7 +927,8 @@ function DetailReclamation() {
           {
             method: 'GET',
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization:
+                `Bearer ${token}`,
             },
           },
         )
@@ -990,7 +1035,8 @@ function DetailReclamation() {
             headers: {
               'Content-Type':
                 'application/json',
-              Authorization: `Bearer ${token}`,
+              Authorization:
+                `Bearer ${token}`,
             },
             body: JSON.stringify({
               departement,
@@ -1036,6 +1082,133 @@ function DetailReclamation() {
       )
     } finally {
       setUpdatingAI(false)
+    }
+  }
+
+  async function handleSendResponse() {
+    const token =
+      localStorage.getItem(
+        'access_token',
+      )
+
+    if (
+      !token ||
+      !id ||
+      !reclamation
+    ) {
+      return
+    }
+
+    const responseText =
+      responseDraft.trim()
+
+    if (!responseText) {
+      setError(
+        'La réponse au citoyen ne peut pas être vide.',
+      )
+      return
+    }
+
+    if (reclamation.reponseFinale) {
+      setError(
+        'Une réponse finale a déjà été envoyée pour cette réclamation.',
+      )
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setSendingResponse(true)
+
+    try {
+      const response =
+        await fetch(
+          `http://localhost:3000/reclamations/${id}/reponse`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Authorization:
+                `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              reponse:
+                responseText,
+            }),
+          },
+        )
+
+      const data =
+        await response.json()
+
+      if (
+        response.status === 401
+      ) {
+        clearSessionAndRedirect()
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          Array.isArray(
+            data.message,
+          )
+            ? data.message.join(', ')
+            : data.message ||
+                'Impossible d’envoyer la réponse au citoyen.',
+        )
+      }
+
+      const refreshResponse =
+        await fetch(
+          `http://localhost:3000/reclamations/${id}`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          },
+        )
+
+      if (
+        refreshResponse.status === 401
+      ) {
+        clearSessionAndRedirect()
+        return
+      }
+
+      if (refreshResponse.ok) {
+        const refreshData =
+          await refreshResponse.json()
+
+        applyReclamationData(
+          refreshData as Reclamation,
+        )
+      } else if (
+        data.reclamation
+      ) {
+        applyReclamationData(
+          data.reclamation as Reclamation,
+        )
+      } else {
+        setResponseDraft(
+          responseText,
+        )
+      }
+
+      setSuccess(
+        'La réponse finale a été envoyée au citoyen avec succès.',
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Une erreur est survenue.',
+      )
+    } finally {
+      setSendingResponse(false)
     }
   }
 
@@ -1111,6 +1284,7 @@ function DetailReclamation() {
       reclamation.serviceIA ||
       reclamation.prioriteIA ||
       reclamation.confianceIA !== null ||
+      reclamation.reponseIA ||
       reclamation.analyseIAAt,
     )
 
@@ -1130,6 +1304,13 @@ function DetailReclamation() {
         reclamation.serviceIA &&
       reclamation.priorite ===
         reclamation.prioriteIA,
+    )
+
+  const canSendResponse =
+    canChangeStatus &&
+    !reclamation.reponseFinale &&
+    Boolean(
+      reclamation.reponseIA,
     )
 
   return (
@@ -1249,7 +1430,8 @@ function DetailReclamation() {
                   }
                   disabled={
                     updating ||
-                    updatingAI
+                    updatingAI ||
+                    sendingResponse
                   }
                 >
                   <option value="EN_ATTENTE">
@@ -1278,6 +1460,7 @@ function DetailReclamation() {
                   disabled={
                     updating ||
                     updatingAI ||
+                    sendingResponse ||
                     selectedStatus ===
                       reclamation.statut
                   }
@@ -1549,6 +1732,137 @@ function DetailReclamation() {
                 </div>
               </div>
 
+              {reclamation.reponseIA && (
+                <div className="ai-response-panel">
+                  <div className="ai-response-header">
+                    <div>
+                      <span className="ai-response-label">
+                        Réponse proposée par l'IA
+                      </span>
+
+                      <h4>
+                        Proposition de réponse au citoyen
+                      </h4>
+                    </div>
+
+                    <span className="ai-response-badge">
+                      Brouillon IA
+                    </span>
+                  </div>
+
+                  <div className="ai-response-content">
+                    {reclamation.reponseIA}
+                  </div>
+
+                  <p className="ai-response-note">
+                    Cette réponse est une proposition générée
+                    automatiquement. Elle doit être vérifiée,
+                    puis modifiée si nécessaire, par un agent
+                    avant tout envoi au citoyen.
+                  </p>
+                </div>
+              )}
+
+              {canSendResponse && (
+                <div className="final-response-panel">
+                  <div className="final-response-header">
+                    <div>
+                      <span className="final-response-label">
+                        Réponse finale
+                      </span>
+
+                      <h4>
+                        Vérifier et envoyer au citoyen
+                      </h4>
+                    </div>
+
+                    <span className="final-response-badge">
+                      Action agent
+                    </span>
+                  </div>
+
+                  <p className="final-response-description">
+                    Vous pouvez modifier la proposition de
+                    l’IA avant de l’envoyer. Le texte ci-dessous
+                    sera enregistré comme réponse finale et
+                    transmis au citoyen par notification.
+                  </p>
+
+                  <div className="final-response-field">
+                    <label htmlFor="reponse-finale">
+                      Message envoyé au citoyen
+                    </label>
+
+                    <textarea
+                      id="reponse-finale"
+                      value={
+                        responseDraft
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setResponseDraft(
+                          event.target.value,
+                        )
+                      }
+                      rows={7}
+                      placeholder="Rédigez la réponse finale au citoyen..."
+                      disabled={
+                        sendingResponse
+                      }
+                    />
+                  </div>
+
+                  <div className="final-response-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={
+                        handleSendResponse
+                      }
+                      disabled={
+                        sendingResponse ||
+                        !responseDraft.trim()
+                      }
+                    >
+                      {sendingResponse
+                        ? 'Envoi en cours...'
+                        : 'Envoyer au citoyen'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {reclamation.reponseFinale && (
+                <div className="final-response-sent-panel">
+                  <div className="final-response-header">
+                    <div>
+                      <span className="final-response-label">
+                        Réponse finale envoyée
+                      </span>
+
+                      <h4>
+                        Réponse transmise au citoyen
+                      </h4>
+                    </div>
+
+                    <span className="final-response-sent-badge">
+                      Envoyée
+                    </span>
+                  </div>
+
+                  <div className="final-response-content">
+                    {reclamation.reponseFinale}
+                  </div>
+
+                  <p className="final-response-note">
+                    Cette réponse est la version finale enregistrée
+                    et transmise au citoyen. Elle ne peut plus être
+                    renvoyée depuis cette réclamation.
+                  </p>
+                </div>
+              )}
+
               {needsAiValidation && (
                 <div className="ai-validation-panel">
                   <div className="ai-validation-header">
@@ -1682,7 +1996,8 @@ function DetailReclamation() {
                       }
                       disabled={
                         updatingAI ||
-                        updating
+                        updating ||
+                        sendingResponse
                       }
                     >
                       {updatingAI

@@ -41,6 +41,8 @@ model Reclamation {
   serviceIA         String?
   prioriteIA        String?
   confianceIA       Float?
+  reponseIA          String?
+  reponseFinale      String?
   analyseIAAt       DateTime?
   iaValidee         Boolean                 @default(false)
 
