@@ -1,53 +1,46 @@
 import {
+  IsDateString,
+  IsIn,
   IsOptional,
   IsString,
-  IsDateString,
-} from 'class-validator';
-
+} from 'class-validator'
 
 export class UpdateReclamationDto {
-
-
   @IsOptional()
   @IsString()
-  numeroBureauOrdre?: string;
-
-
+  numeroBureauOrdre?: string
 
   @IsOptional()
   @IsDateString()
-  dateBureauOrdre?: string;
-
-
+  dateBureauOrdre?: string
 
   @IsOptional()
   @IsDateString()
-  dateReception?: string;
-
-
+  dateReception?: string
 
   @IsOptional()
   @IsString()
-  departement?: string;
-
-
+  departement?: string
 
   @IsOptional()
   @IsString()
-  service?: string;
-
-
+  service?: string
 
   @IsOptional()
   @IsString()
-  misEnCause?: string;
+  misEnCause?: string
 
-
-
-  // AJOUTER CETTE PARTIE
   @IsOptional()
   @IsString()
-  statut?: string;
+  @IsIn([
+    'BASSE',
+    'NORMALE',
+    'HAUTE',
+    'URGENTE',
+  ])
+  priorite?: string
 
-
+  @IsOptional()
+  @IsString()
+  statut?: string
 }

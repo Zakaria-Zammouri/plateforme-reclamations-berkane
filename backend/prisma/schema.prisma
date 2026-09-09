@@ -42,6 +42,7 @@ model Reclamation {
   prioriteIA        String?
   confianceIA       Float?
   analyseIAAt       DateTime?
+  iaValidee         Boolean                 @default(false)
 
   description       String                  @default("Sans description")
   titre             String                  @default("Sans titre")
@@ -68,11 +69,13 @@ model HistoriqueReclamation {
   userId        Int?
   ancienStatut  String?
   nouveauStatut String
+  actionTypee   String?
+  detail        String?
   createdAt     DateTime    @default(now())
+
   reclamation   Reclamation @relation(fields: [reclamationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   user          User?       @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
-
 model Notification {
   id            Int      @id @default(autoincrement())
   userId        Int

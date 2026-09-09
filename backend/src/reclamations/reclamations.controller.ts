@@ -158,6 +158,33 @@ export class ReclamationsController {
   }
 
   // =========================================
+  // VALIDATION / CORRECTION ANALYSE IA
+  // ADMIN / AGENT
+  // =========================================
+
+  @Patch(':id/analyse-ia')
+  @ApiOperation({
+    summary:
+      'Valider ou corriger la classification IA',
+  })
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+  )
+  @Roles('ADMIN', 'AGENT')
+  validerAnalyseIA(
+    @Param('id') id: string,
+    @Body() dto: UpdateReclamationDto,
+    @Req() req: any,
+  ) {
+    return this.reclamationsService.validerAnalyseIA(
+      Number(id),
+      dto,
+      req.user.userId,
+    )
+  }
+
+  // =========================================
   // CHANGEMENT DE STATUT
   // =========================================
 

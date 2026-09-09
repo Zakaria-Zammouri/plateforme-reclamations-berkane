@@ -28,6 +28,8 @@ type HistoriqueReclamation = {
   id: number
   ancienStatut: string | null
   nouveauStatut: string
+  actionTypee: string | null
+  detail: string | null
   createdAt: string
   user?: {
     id: number
@@ -48,10 +50,20 @@ type Reclamation = {
   misEnCause: string | null
   statut: string
   priorite: string
+
+  categorieIA: string | null
+  departementIA: string | null
+  serviceIA: string | null
+  prioriteIA: string | null
+  confianceIA: number | null
+  analyseIAAt: string | null
+  iaValidee: boolean
+
   titre: string
   description: string
   createdAt: string
   updatedAt: string
+
   fichiers?: FichierJoint[]
   historiques?: HistoriqueReclamation[]
 }
@@ -97,26 +109,49 @@ function HistoryIcon() {
         cy="12"
         r="8"
       />
-
       <path d="M12 8v5l3 2" />
       <path d="M4 5l2 2" />
     </svg>
   )
 }
 
-function DetailReclamation() {
-  const { id } =
-    useParams<{
-      id: string
-    }>()
+function AIIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
+      <rect
+        x="4"
+        y="4"
+        width="16"
+        height="16"
+        rx="4"
+      />
+      <path d="M8 9h8M8 13h5M8 17h3" />
+      <circle
+        cx="17"
+        cy="16"
+        r="2"
+      />
+    </svg>
+  )
+}
 
-  const navigate =
-    useNavigate()
+function DetailReclamation() {
+  const { id } = useParams<{
+    id: string
+  }>()
+
+  const navigate = useNavigate()
 
   const [reclamation, setReclamation] =
-    useState<Reclamation | null>(
-      null,
-    )
+    useState<Reclamation | null>(null)
 
   const [role, setRole] =
     useState('')
@@ -124,10 +159,22 @@ function DetailReclamation() {
   const [selectedStatus, setSelectedStatus] =
     useState('')
 
+  const [selectedDepartement, setSelectedDepartement] =
+    useState('')
+
+  const [selectedService, setSelectedService] =
+    useState('')
+
+  const [selectedPriorite, setSelectedPriorite] =
+    useState('')
+
   const [loading, setLoading] =
     useState(true)
 
   const [updating, setUpdating] =
+    useState(false)
+
+  const [updatingAI, setUpdatingAI] =
     useState(false)
 
   const [error, setError] =
@@ -148,6 +195,87 @@ function DetailReclamation() {
     navigate('/connexion', {
       replace: true,
     })
+  }
+
+  function applyReclamationData(
+    data: Reclamation,
+  ) {
+    const normalizedData: Reclamation = {
+      ...data,
+
+      fichiers:
+        Array.isArray(
+          data.fichiers,
+        )
+          ? data.fichiers
+          : [],
+
+      historiques:
+        Array.isArray(
+          data.historiques,
+        )
+          ? data.historiques
+          : [],
+
+      priorite:
+        data.priorite ||
+        'NORMALE',
+
+      iaValidee:
+        data.iaValidee === true,
+
+      categorieIA:
+        data.categorieIA ??
+        null,
+
+      departementIA:
+        data.departementIA ??
+        null,
+
+      serviceIA:
+        data.serviceIA ??
+        null,
+
+      prioriteIA:
+        data.prioriteIA ??
+        null,
+
+      confianceIA:
+        typeof data.confianceIA ===
+          'number'
+          ? data.confianceIA
+          : null,
+
+      analyseIAAt:
+        data.analyseIAAt ??
+        null,
+    }
+
+    setReclamation(
+      normalizedData,
+    )
+
+    setSelectedStatus(
+      normalizedData.statut,
+    )
+
+    setSelectedDepartement(
+      normalizedData.departement ||
+        normalizedData.departementIA ||
+        '',
+    )
+
+    setSelectedService(
+      normalizedData.service ||
+        normalizedData.serviceIA ||
+        '',
+    )
+
+    setSelectedPriorite(
+      normalizedData.priorite ||
+        normalizedData.prioriteIA ||
+        'NORMALE',
+    )
   }
 
   useEffect(() => {
@@ -171,7 +299,11 @@ function DetailReclamation() {
         const user: User =
           JSON.parse(savedUser)
 
-        setRole(user.role)
+        setRole(
+          user.role
+            .trim()
+            .toUpperCase(),
+        )
       } catch {
         clearSessionAndRedirect()
         return
@@ -221,30 +353,8 @@ function DetailReclamation() {
           )
         }
 
-        setReclamation({
-          ...data,
-
-          fichiers:
-            Array.isArray(
-              data.fichiers,
-            )
-              ? data.fichiers
-              : [],
-
-          historiques:
-            Array.isArray(
-              data.historiques,
-            )
-              ? data.historiques
-              : [],
-
-          priorite:
-            data.priorite ||
-            'NORMALE',
-        })
-
-        setSelectedStatus(
-          data.statut,
+        applyReclamationData(
+          data as Reclamation,
         )
       } catch (err) {
         setError(
@@ -344,6 +454,93 @@ function DetailReclamation() {
     }
   }
 
+  function getHistoryActionLabel(
+    actionTypee: string | null,
+  ) {
+    switch (actionTypee) {
+      case 'CREATION':
+        return 'Création'
+
+      case 'VALIDATION_IA':
+        return 'Validation de la classification IA'
+
+      case 'STATUT':
+        return 'Changement de statut'
+
+      default:
+        return 'Action'
+    }
+  }
+
+  function getHistoryActionClass(
+    actionTypee: string | null,
+  ) {
+    switch (actionTypee) {
+      case 'CREATION':
+        return 'history-action history-action-create'
+
+      case 'VALIDATION_IA':
+        return 'history-action history-action-ai'
+
+      case 'STATUT':
+        return 'history-action history-action-status'
+
+      default:
+        return 'history-action'
+    }
+  }
+
+  function getHistoryTitle(
+    historique: HistoriqueReclamation,
+  ) {
+    if (
+      historique.actionTypee ===
+      'VALIDATION_IA'
+    ) {
+      return 'Classification IA validée'
+    }
+
+    if (
+      historique.actionTypee ===
+      'STATUT'
+    ) {
+      if (
+        historique.ancienStatut
+      ) {
+        return `${getStatusLabel(
+          historique.ancienStatut,
+        )} → ${getStatusLabel(
+          historique.nouveauStatut,
+        )}`
+      }
+
+      return `Statut : ${getStatusLabel(
+        historique.nouveauStatut,
+      )}`
+    }
+
+    if (
+      historique.actionTypee ===
+      'CREATION'
+    ) {
+      return 'Réclamation créée'
+    }
+
+    if (
+      historique.ancienStatut
+    ) {
+      return `${getStatusLabel(
+        historique.ancienStatut,
+      )} → ${getStatusLabel(
+        historique.nouveauStatut,
+      )}`
+    }
+
+    return `Réclamation créée — ${getStatusLabel(
+      historique.nouveauStatut,
+    )}`
+  }
+
   function formatDate(
     date: string | null,
   ) {
@@ -367,6 +564,90 @@ function DetailReclamation() {
       dateStyle: 'short',
       timeStyle: 'short',
     })
+  }
+
+  function formatConfidence(
+    confidence: number | null,
+  ) {
+    if (
+      confidence === null ||
+      !Number.isFinite(
+        confidence,
+      )
+    ) {
+      return 'Non disponible'
+    }
+
+    return `${Math.round(
+      confidence * 100,
+    )} %`
+  }
+
+  function getConfidenceClass(
+    confidence: number | null,
+  ) {
+    if (
+      confidence === null ||
+      !Number.isFinite(
+        confidence,
+      )
+    ) {
+      return ''
+    }
+
+    if (confidence >= 0.85) {
+      return 'priority-low'
+    }
+
+    if (confidence >= 0.65) {
+      return 'priority-normal'
+    }
+
+    if (confidence >= 0.4) {
+      return 'priority-high'
+    }
+
+    return 'priority-urgent'
+  }
+
+  function formatCategory(
+    categorie: string | null,
+  ) {
+    if (!categorie) {
+      return 'Non disponible'
+    }
+
+    return categorie
+      .replace(
+        /_/g,
+        ' ',
+      )
+      .toLowerCase()
+      .replace(
+        /(^\w|\s\w)/g,
+        (letter) =>
+          letter.toUpperCase(),
+      )
+  }
+
+  function formatAiValue(
+    value: string | null,
+  ) {
+    if (!value) {
+      return 'Non disponible'
+    }
+
+    return value
+      .replace(
+        /_/g,
+        ' ',
+      )
+      .toLowerCase()
+      .replace(
+        /(^\w|\s\w)/g,
+        (letter) =>
+          letter.toUpperCase(),
+      )
   }
 
   function formatFileSize(
@@ -566,10 +847,8 @@ function DetailReclamation() {
             headers: {
               'Content-Type':
                 'application/json',
-
               Authorization: `Bearer ${token}`,
             },
-
             body: JSON.stringify({
               statut:
                 selectedStatus,
@@ -598,28 +877,6 @@ function DetailReclamation() {
         )
       }
 
-      setReclamation(
-        (current) =>
-          current
-            ? {
-                ...current,
-
-                statut:
-                  data.statut ??
-                  selectedStatus,
-
-                updatedAt:
-                  data.updatedAt ??
-                  current.updatedAt,
-              }
-            : current,
-      )
-
-      setSelectedStatus(
-        data.statut ??
-          selectedStatus,
-      )
-
       const refreshResponse =
         await fetch(
           `http://localhost:3000/reclamations/${id}`,
@@ -643,31 +900,8 @@ function DetailReclamation() {
         const refreshData =
           await refreshResponse.json()
 
-        setReclamation({
-          ...refreshData,
-
-          fichiers:
-            Array.isArray(
-              refreshData.fichiers,
-            )
-              ? refreshData.fichiers
-              : [],
-
-          historiques:
-            Array.isArray(
-              refreshData.historiques,
-            )
-              ? refreshData.historiques
-              : [],
-
-          priorite:
-            refreshData.priorite ||
-            'NORMALE',
-        })
-
-        setSelectedStatus(
-          refreshData.statut ??
-            selectedStatus,
+        applyReclamationData(
+          refreshData as Reclamation,
         )
       }
 
@@ -682,6 +916,126 @@ function DetailReclamation() {
       )
     } finally {
       setUpdating(false)
+    }
+  }
+
+  async function handleValidateAI() {
+    const token =
+      localStorage.getItem(
+        'access_token',
+      )
+
+    if (
+      !token ||
+      !id ||
+      !reclamation ||
+      reclamation.iaValidee
+    ) {
+      return
+    }
+
+    const departement =
+      selectedDepartement.trim()
+
+    const service =
+      selectedService.trim()
+
+    const priorite =
+      selectedPriorite
+        .trim()
+        .toUpperCase()
+
+    if (!departement) {
+      setError(
+        'Le département final est obligatoire.',
+      )
+      return
+    }
+
+    if (!service) {
+      setError(
+        'Le service final est obligatoire.',
+      )
+      return
+    }
+
+    const prioritesAutorisees = [
+      'BASSE',
+      'NORMALE',
+      'HAUTE',
+      'URGENTE',
+    ]
+
+    if (
+      !prioritesAutorisees.includes(
+        priorite,
+      )
+    ) {
+      setError(
+        'La priorité sélectionnée est invalide.',
+      )
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setUpdatingAI(true)
+
+    try {
+      const response =
+        await fetch(
+          `http://localhost:3000/reclamations/${id}/analyse-ia`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              departement,
+              service,
+              priorite,
+            }),
+          },
+        )
+
+      const data =
+        await response.json()
+
+      if (
+        response.status === 401
+      ) {
+        clearSessionAndRedirect()
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          Array.isArray(
+            data.message,
+          )
+            ? data.message.join(', ')
+            : data.message ||
+                'Impossible de valider l’analyse IA.',
+        )
+      }
+
+      applyReclamationData(
+        data as Reclamation,
+      )
+
+      setSuccess(
+        'La classification IA a été validée et les valeurs finales ont été enregistrées.',
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Une erreur est survenue.',
+      )
+    } finally {
+      setUpdatingAI(false)
     }
   }
 
@@ -750,6 +1104,34 @@ function DetailReclamation() {
   const fichiers =
     reclamation.fichiers ?? []
 
+  const hasAiAnalysis =
+    Boolean(
+      reclamation.categorieIA ||
+      reclamation.departementIA ||
+      reclamation.serviceIA ||
+      reclamation.prioriteIA ||
+      reclamation.confianceIA !== null ||
+      reclamation.analyseIAAt,
+    )
+
+  const needsAiValidation =
+    canChangeStatus &&
+    hasAiAnalysis &&
+    !reclamation.iaValidee
+
+  const aiMatchesFinalValues =
+    Boolean(
+      reclamation.departementIA &&
+      reclamation.serviceIA &&
+      reclamation.prioriteIA &&
+      reclamation.departement ===
+        reclamation.departementIA &&
+      reclamation.service ===
+        reclamation.serviceIA &&
+      reclamation.priorite ===
+        reclamation.prioriteIA,
+    )
+
   return (
     <main className="detail-page">
       <div className="detail-container">
@@ -765,7 +1147,8 @@ function DetailReclamation() {
             </h1>
 
             <p>
-              Consultez les informations, les fichiers et l'historique du traitement.
+              Consultez les informations, les
+              fichiers et l'historique du traitement.
             </p>
           </div>
 
@@ -818,6 +1201,20 @@ function DetailReclamation() {
                   reclamation.priorite,
                 )}
               </span>
+
+              {hasAiAnalysis && (
+                <span
+                  className={
+                    reclamation.iaValidee
+                      ? 'agent-ai-badge agent-ai-badge-valid'
+                      : 'agent-ai-badge agent-ai-badge-pending'
+                  }
+                >
+                  {reclamation.iaValidee
+                    ? 'Classification validée'
+                    : 'IA à valider'}
+                </span>
+              )}
             </div>
           </div>
 
@@ -833,7 +1230,8 @@ function DetailReclamation() {
                 </h3>
 
                 <p>
-                  Le nouveau statut sera enregistré dans l'historique.
+                  Le nouveau statut sera enregistré
+                  dans l'historique.
                 </p>
               </div>
 
@@ -850,7 +1248,8 @@ function DetailReclamation() {
                     )
                   }
                   disabled={
-                    updating
+                    updating ||
+                    updatingAI
                   }
                 >
                   <option value="EN_ATTENTE">
@@ -878,6 +1277,7 @@ function DetailReclamation() {
                   }
                   disabled={
                     updating ||
+                    updatingAI ||
                     selectedStatus ===
                       reclamation.statut
                   }
@@ -1022,6 +1422,328 @@ function DetailReclamation() {
             </div>
           </div>
 
+          {hasAiAnalysis && (
+            <div className="detail-section">
+              <h3>
+                <span className="detail-heading-icon">
+                  <AIIcon />
+                </span>
+
+                Analyse IA
+              </h3>
+
+              <div className="detail-grid">
+                <div>
+                  <span>
+                    Catégorie détectée
+                  </span>
+
+                  <strong>
+                    {formatCategory(
+                      reclamation.categorieIA,
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Département proposé
+                  </span>
+
+                  <strong>
+                    {formatAiValue(
+                      reclamation.departementIA,
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Service proposé
+                  </span>
+
+                  <strong>
+                    {formatAiValue(
+                      reclamation.serviceIA,
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Priorité proposée
+                  </span>
+
+                  <strong>
+                    {reclamation.prioriteIA ? (
+                      <span
+                        className={`priority-badge ${getPriorityClass(
+                          reclamation.prioriteIA,
+                        )}`}
+                      >
+                        {getPriorityLabel(
+                          reclamation.prioriteIA,
+                        )}
+                      </span>
+                    ) : (
+                      'Non disponible'
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Niveau de confiance
+                  </span>
+
+                  <strong>
+                    {reclamation.confianceIA !==
+                    null ? (
+                      <span
+                        className={`priority-badge ${getConfidenceClass(
+                          reclamation.confianceIA,
+                        )}`}
+                      >
+                        {formatConfidence(
+                          reclamation.confianceIA,
+                        )}
+                      </span>
+                    ) : (
+                      'Non disponible'
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    État de validation
+                  </span>
+
+                  <strong>
+                    <span
+                      className={
+                        reclamation.iaValidee
+                          ? 'agent-ai-badge agent-ai-badge-valid'
+                          : 'agent-ai-badge agent-ai-badge-pending'
+                      }
+                    >
+                      {reclamation.iaValidee
+                        ? 'Classification validée'
+                        : 'IA à valider'}
+                    </span>
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Date de l'analyse
+                  </span>
+
+                  <strong>
+                    {reclamation.analyseIAAt
+                      ? formatDateTime(
+                          reclamation.analyseIAAt,
+                        )
+                      : 'Non renseignée'}
+                  </strong>
+                </div>
+              </div>
+
+              {needsAiValidation && (
+                <div className="ai-validation-panel">
+                  <div className="ai-validation-header">
+                    <div>
+                      <span className="ai-validation-label">
+                        Validation humaine
+                      </span>
+
+                      <h4>
+                        Valider ou corriger la classification
+                      </h4>
+                    </div>
+
+                    <span
+                      className={
+                        aiMatchesFinalValues
+                          ? 'ai-validation-state ai-validation-confirmed'
+                          : 'ai-validation-state ai-validation-to-review'
+                      }
+                    >
+                      {aiMatchesFinalValues
+                        ? 'Classification concordante'
+                        : 'Vérification recommandée'}
+                    </span>
+                  </div>
+
+                  <p className="ai-validation-description">
+                    Vérifiez la proposition de
+                    l’intelligence artificielle puis
+                    confirmez les valeurs finales de la
+                    réclamation.
+                  </p>
+
+                  <div className="ai-validation-grid">
+                    <div className="ai-validation-field">
+                      <label htmlFor="ai-departement">
+                        Département final
+                      </label>
+
+                      <input
+                        id="ai-departement"
+                        type="text"
+                        value={
+                          selectedDepartement
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          setSelectedDepartement(
+                            event.target.value,
+                          )
+                        }
+                        placeholder="Département"
+                        disabled={
+                          updatingAI
+                        }
+                      />
+                    </div>
+
+                    <div className="ai-validation-field">
+                      <label htmlFor="ai-service">
+                        Service final
+                      </label>
+
+                      <input
+                        id="ai-service"
+                        type="text"
+                        value={
+                          selectedService
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          setSelectedService(
+                            event.target.value,
+                          )
+                        }
+                        placeholder="Service"
+                        disabled={
+                          updatingAI
+                        }
+                      />
+                    </div>
+
+                    <div className="ai-validation-field">
+                      <label htmlFor="ai-priorite">
+                        Priorité finale
+                      </label>
+
+                      <select
+                        id="ai-priorite"
+                        value={
+                          selectedPriorite
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          setSelectedPriorite(
+                            event.target.value,
+                          )
+                        }
+                        disabled={
+                          updatingAI
+                        }
+                      >
+                        <option value="BASSE">
+                          Basse
+                        </option>
+
+                        <option value="NORMALE">
+                          Normale
+                        </option>
+
+                        <option value="HAUTE">
+                          Haute
+                        </option>
+
+                        <option value="URGENTE">
+                          Urgente
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="ai-validation-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={
+                        handleValidateAI
+                      }
+                      disabled={
+                        updatingAI ||
+                        updating
+                      }
+                    >
+                      {updatingAI
+                        ? 'Enregistrement...'
+                        : 'Valider la classification IA'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {canChangeStatus &&
+                hasAiAnalysis &&
+                reclamation.iaValidee && (
+                <div className="ai-validation-readonly">
+                  <strong>
+                    Classification IA validée
+                  </strong>
+
+                  <p>
+                    Cette classification a déjà été
+                    vérifiée et enregistrée par un agent
+                    ou un administrateur.
+                  </p>
+                </div>
+              )}
+
+              {!canChangeStatus && (
+                <div className="ai-validation-readonly">
+                  <strong>
+                    Classification assistée par IA
+                  </strong>
+
+                  <p>
+                    Cette analyse est présentée à
+                    titre informatif. La validation et
+                    la correction sont réservées aux
+                    agents et administrateurs de la
+                    commune.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!hasAiAnalysis && (
+            <div className="detail-section">
+              <h3>
+                <span className="detail-heading-icon">
+                  <AIIcon />
+                </span>
+
+                Analyse IA
+              </h3>
+
+              <div className="detail-empty">
+                Aucune analyse IA enregistrée pour
+                cette réclamation.
+              </div>
+            </div>
+          )}
+
           <div className="detail-section">
             <h3>
               Description
@@ -1133,17 +1855,25 @@ function DetailReclamation() {
 
                       <div className="history-content">
                         <div className="history-top">
-                          <strong>
-                            {historique.ancienStatut
-                              ? `${getStatusLabel(
-                                  historique.ancienStatut,
-                                )} → ${getStatusLabel(
-                                  historique.nouveauStatut,
-                                )}`
-                              : `Réclamation créée — ${getStatusLabel(
-                                  historique.nouveauStatut,
-                                )}`}
-                          </strong>
+                          <div className="history-title-group">
+                            <strong>
+                              {getHistoryTitle(
+                                historique,
+                              )}
+                            </strong>
+
+                            {historique.actionTypee && (
+                              <span
+                                className={getHistoryActionClass(
+                                  historique.actionTypee,
+                                )}
+                              >
+                                {getHistoryActionLabel(
+                                  historique.actionTypee,
+                                )}
+                              </span>
+                            )}
+                          </div>
 
                           <time>
                             {formatDateTime(
@@ -1153,7 +1883,7 @@ function DetailReclamation() {
                         </div>
 
                         <p>
-                          Par:{' '}
+                          Par :{' '}
                           <strong>
                             {historique.user?.nom ||
                               'Utilisateur'}
@@ -1169,6 +1899,12 @@ function DetailReclamation() {
                             </span>
                           )}
                         </p>
+
+                        {historique.detail && (
+                          <div className="history-detail">
+                            {historique.detail}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ),

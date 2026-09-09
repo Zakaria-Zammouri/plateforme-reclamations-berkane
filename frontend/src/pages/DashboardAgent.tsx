@@ -34,6 +34,13 @@ type Reclamation = {
   description: string | null
   statut: string
   priorite: string
+  iaValidee: boolean
+  categorieIA: string | null
+  departementIA: string | null
+  serviceIA: string | null
+  prioriteIA: string | null
+  confianceIA: number | null
+  analyseIAAt: string | null
   createdAt: string
   updatedAt: string
   user?: User
@@ -64,7 +71,8 @@ function DashboardAgent() {
   const navigate = useNavigate()
 
   const [user, setUser] = useState<User | null>(null)
-  const [reclamations, setReclamations] = useState<Reclamation[]>([])
+  const [reclamations, setReclamations] =
+    useState<Reclamation[]>([])
   const [statistiques, setStatistiques] =
     useState<Statistiques | null>(null)
 
@@ -72,7 +80,10 @@ function DashboardAgent() {
   const [statutFilter, setStatutFilter] = useState('')
   const [prioriteFilter, setPrioriteFilter] = useState('')
   const [serviceFilter, setServiceFilter] = useState('')
-  const [departementFilter, setDepartementFilter] = useState('')
+  const [departementFilter, setDepartementFilter] =
+    useState('')
+  const [iaValidationFilter, setIaValidationFilter] =
+    useState('')
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -104,28 +115,30 @@ function DashboardAgent() {
 
     async function loadDashboard() {
       try {
-        const [reclamationsResponse, statistiquesResponse] =
-          await Promise.all([
-            fetch(
-              'http://localhost:3000/reclamations',
-              {
-                method: 'GET',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
+        const [
+          reclamationsResponse,
+          statistiquesResponse,
+        ] = await Promise.all([
+          fetch(
+            'http://localhost:3000/reclamations',
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
               },
-            ),
+            },
+          ),
 
-            fetch(
-              'http://localhost:3000/reclamations/statistiques',
-              {
-                method: 'GET',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
+          fetch(
+            'http://localhost:3000/reclamations/statistiques',
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
               },
-            ),
-          ])
+            },
+          ),
+        ])
 
         if (
           reclamationsResponse.status === 401 ||
@@ -179,11 +192,14 @@ function DashboardAgent() {
             ...reclamation,
             priorite:
               reclamation.priorite || 'NORMALE',
+            iaValidee:
+              reclamation.iaValidee === true,
           })),
         )
 
         setStatistiques({
           ...stats,
+
           parPriorite:
             Array.isArray(stats.parPriorite)
               ? stats.parPriorite
@@ -302,12 +318,30 @@ function DashboardAgent() {
     }
   }
 
+  function getIaValidationLabel(
+    iaValidee: boolean,
+  ) {
+    return iaValidee
+      ? 'Classification validée'
+      : 'IA à valider'
+  }
+
+  function getIaValidationClass(
+    iaValidee: boolean,
+  ) {
+    return iaValidee
+      ? 'agent-ai-badge agent-ai-badge-valid'
+      : 'agent-ai-badge agent-ai-badge-pending'
+  }
+
   function formatDate(date: string | null) {
     if (!date) {
       return 'Non renseignée'
     }
 
-    return new Date(date).toLocaleDateString('fr-FR')
+    return new Date(date).toLocaleDateString(
+      'fr-FR',
+    )
   }
 
   const services = useMemo(() => {
@@ -329,7 +363,9 @@ function DashboardAgent() {
     return Array.from(
       new Set(
         reclamations
-          .map((item) => item.departement?.trim())
+          .map((item) =>
+            item.departement?.trim(),
+          )
           .filter(
             (value): value is string =>
               Boolean(value),
@@ -340,65 +376,103 @@ function DashboardAgent() {
     )
   }, [reclamations])
 
+  const reclamationsIaAValider = useMemo(() => {
+    return reclamations.filter(
+      (reclamation) =>
+        !reclamation.iaValidee,
+    )
+  }, [reclamations])
+
+  const reclamationsIaValidees = useMemo(() => {
+    return reclamations.filter(
+      (reclamation) =>
+        reclamation.iaValidee,
+    )
+  }, [reclamations])
+
   const reclamationsFiltrees = useMemo(() => {
-    const normalizedSearch = search
-      .trim()
-      .toLowerCase()
+    const normalizedSearch =
+      search.trim().toLowerCase()
 
-    return reclamations.filter((reclamation) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        String(reclamation.numeroClassement)
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.titre || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.description || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.user?.nom || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.user?.email || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.service || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.departement || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        getPriorityLabel(reclamation.priorite)
-          .toLowerCase()
-          .includes(normalizedSearch)
+    return reclamations.filter(
+      (reclamation) => {
+        const matchesSearch =
+          !normalizedSearch ||
+          String(
+            reclamation.numeroClassement,
+          )
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.titre || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.description || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.user?.nom || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.user?.email || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.service || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.departement || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          getPriorityLabel(
+            reclamation.priorite,
+          )
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          getIaValidationLabel(
+            reclamation.iaValidee,
+          )
+            .toLowerCase()
+            .includes(normalizedSearch)
 
-      const matchesStatus =
-        !statutFilter ||
-        reclamation.statut === statutFilter
+        const matchesStatus =
+          !statutFilter ||
+          reclamation.statut ===
+            statutFilter
 
-      const matchesPriority =
-        !prioriteFilter ||
-        reclamation.priorite === prioriteFilter
+        const matchesPriority =
+          !prioriteFilter ||
+          reclamation.priorite ===
+            prioriteFilter
 
-      const matchesService =
-        !serviceFilter ||
-        (reclamation.service || '').trim() ===
-          serviceFilter
+        const matchesService =
+          !serviceFilter ||
+          (reclamation.service || '').trim() ===
+            serviceFilter
 
-      const matchesDepartement =
-        !departementFilter ||
-        (reclamation.departement || '').trim() ===
-          departementFilter
+        const matchesDepartement =
+          !departementFilter ||
+          (
+            reclamation.departement ||
+            ''
+          ).trim() === departementFilter
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesPriority &&
-        matchesService &&
-        matchesDepartement
-      )
-    })
+        const matchesIaValidation =
+          !iaValidationFilter ||
+          (
+            iaValidationFilter ===
+            'A_VALIDER'
+              ? !reclamation.iaValidee
+              : reclamation.iaValidee
+          )
+
+        return (
+          matchesSearch &&
+          matchesStatus &&
+          matchesPriority &&
+          matchesService &&
+          matchesDepartement &&
+          matchesIaValidation
+        )
+      },
+    )
   }, [
     reclamations,
     search,
@@ -406,6 +480,7 @@ function DashboardAgent() {
     prioriteFilter,
     serviceFilter,
     departementFilter,
+    iaValidationFilter,
   ])
 
   function resetFilters() {
@@ -414,6 +489,7 @@ function DashboardAgent() {
     setPrioriteFilter('')
     setServiceFilter('')
     setDepartementFilter('')
+    setIaValidationFilter('')
   }
 
   function handleExportCsv() {
@@ -434,7 +510,8 @@ function DashboardAgent() {
     statutFilter !== '' ||
     prioriteFilter !== '' ||
     serviceFilter !== '' ||
-    departementFilter !== ''
+    departementFilter !== '' ||
+    iaValidationFilter !== ''
 
   return (
     <main className="agent-page">
@@ -446,11 +523,16 @@ function DashboardAgent() {
             </span>
 
             <h1>
-              Bonjour{user?.nom ? ` ${user.nom}` : ''}
+              Bonjour
+              {user?.nom
+                ? ` ${user.nom}`
+                : ''}
             </h1>
 
             <p>
-              Consultez et gérez les réclamations transmises à la commune.
+              Consultez et gérez les
+              réclamations transmises à la
+              commune.
             </p>
           </div>
 
@@ -472,227 +554,193 @@ function DashboardAgent() {
           </div>
         </header>
 
-        {!loading && !error && statistiques && (
-          <>
-            <section className="agent-stats">
-              <article className="agent-stat-card">
-                <span className="agent-stat-label">
-                  Total
-                </span>
+        {!loading &&
+          !error &&
+          statistiques && (
+            <>
+              <section className="agent-stats">
+                <article className="agent-stat-card">
+                  <span className="agent-stat-label">
+                    Total
+                  </span>
 
-                <strong>
-                  {statistiques.total}
-                </strong>
+                  <strong>
+                    {statistiques.total}
+                  </strong>
 
-                <span className="agent-stat-text">
-                  réclamations
-                </span>
-              </article>
+                  <span className="agent-stat-text">
+                    réclamations
+                  </span>
+                </article>
 
-              <article className="agent-stat-card">
-                <span className="agent-stat-label">
-                  En attente
-                </span>
+                <article className="agent-stat-card">
+                  <span className="agent-stat-label">
+                    En attente
+                  </span>
 
-                <strong>
-                  {statistiques.enAttente}
-                </strong>
+                  <strong>
+                    {statistiques.enAttente}
+                  </strong>
 
-                <span className="agent-stat-text">
-                  à traiter
-                </span>
-              </article>
+                  <span className="agent-stat-text">
+                    à traiter
+                  </span>
+                </article>
 
-              <article className="agent-stat-card">
-                <span className="agent-stat-label">
-                  En cours
-                </span>
+                <article className="agent-stat-card">
+                  <span className="agent-stat-label">
+                    En cours
+                  </span>
 
-                <strong>
-                  {statistiques.enCours}
-                </strong>
+                  <strong>
+                    {statistiques.enCours}
+                  </strong>
 
-                <span className="agent-stat-text">
-                  actuellement
-                </span>
-              </article>
+                  <span className="agent-stat-text">
+                    actuellement
+                  </span>
+                </article>
 
-              <article className="agent-stat-card">
-                <span className="agent-stat-label">
-                  Traitées
-                </span>
+                <article className="agent-stat-card">
+                  <span className="agent-stat-label">
+                    Traitées
+                  </span>
 
-                <strong>
-                  {statistiques.traitees}
-                </strong>
+                  <strong>
+                    {statistiques.traitees}
+                  </strong>
 
-                <span className="agent-stat-text">
-                  terminées
-                </span>
-              </article>
+                  <span className="agent-stat-text">
+                    terminées
+                  </span>
+                </article>
 
-              <article className="agent-stat-card">
-                <span className="agent-stat-label">
-                  Urgentes
-                </span>
+                <article className="agent-stat-card">
+                  <span className="agent-stat-label">
+                    Urgentes
+                  </span>
 
-                <strong>
-                  {
-                    statistiques.parPriorite.find(
-                      (item) =>
-                        item.priorite === 'URGENTE',
-                    )?.total ?? 0
-                  }
-                </strong>
+                  <strong>
+                    {
+                      statistiques.parPriorite.find(
+                        (item) =>
+                          item.priorite ===
+                          'URGENTE',
+                      )?.total ?? 0
+                    }
+                  </strong>
 
-                <span className="agent-stat-text">
-                  prioritaires
-                </span>
-              </article>
-            </section>
+                  <span className="agent-stat-text">
+                    prioritaires
+                  </span>
+                </article>
 
-            <section className="agent-overview-grid">
-              <article className="agent-overview-card">
-                <div className="agent-overview-header">
-                  <div>
-                    <span className="agent-overview-label">
-                      Répartition
-                    </span>
+                <article className="agent-stat-card">
+                  <span className="agent-stat-label">
+                    IA à valider
+                  </span>
 
-                    <h2>Par service</h2>
+                  <strong>
+                    {
+                      reclamationsIaAValider.length
+                    }
+                  </strong>
+
+                  <span className="agent-stat-text">
+                    classifications
+                  </span>
+                </article>
+              </section>
+
+              <section className="agent-overview-grid">
+                <article className="agent-overview-card">
+                  <div className="agent-overview-header">
+                    <div>
+                      <span className="agent-overview-label">
+                        Répartition
+                      </span>
+
+                      <h2>
+                        Par service
+                      </h2>
+                    </div>
                   </div>
-                </div>
 
-                {statistiques.parService.length === 0 ? (
-                  <div className="agent-overview-empty">
-                    Aucun service renseigné.
-                  </div>
-                ) : (
-                  <div className="agent-overview-list">
-                    {statistiques.parService
-                      .slice(0, 6)
-                      .map((item) => (
-                        <div
-                          key={item.service}
-                          className="agent-overview-row"
-                        >
-                          <div className="agent-overview-row-top">
-                            <span>
-                              {item.service}
-                            </span>
-
-                            <strong>
-                              {item.total}
-                            </strong>
-                          </div>
-
-                          <div className="agent-overview-bar">
-                            <span
-                              style={{
-                                width: `${
-                                  statistiques.total >
-                                  0
-                                    ? (item.total /
-                                        statistiques.total) *
-                                      100
-                                    : 0
-                                }%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </article>
-
-              <article className="agent-overview-card">
-                <div className="agent-overview-header">
-                  <div>
-                    <span className="agent-overview-label">
-                      Priorités
-                    </span>
-
-                    <h2>
-                      Niveau de priorité
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="agent-overview-list">
-                  {statistiques.parPriorite.map(
-                    (item) => (
-                      <div
-                        key={item.priorite}
-                        className="agent-overview-row"
-                      >
-                        <div className="agent-overview-row-top">
-                          <span
-                            className={`priority-badge ${getPriorityClass(
-                              item.priorite,
-                            )}`}
+                  {statistiques.parService
+                    .length === 0 ? (
+                    <div className="agent-overview-empty">
+                      Aucun service
+                      renseigné.
+                    </div>
+                  ) : (
+                    <div className="agent-overview-list">
+                      {statistiques.parService
+                        .slice(0, 6)
+                        .map((item) => (
+                          <div
+                            key={item.service}
+                            className="agent-overview-row"
                           >
-                            {getPriorityLabel(
-                              item.priorite,
-                            )}
-                          </span>
+                            <div className="agent-overview-row-top">
+                              <span>
+                                {item.service}
+                              </span>
 
-                          <strong>
-                            {item.total}
-                          </strong>
-                        </div>
+                              <strong>
+                                {item.total}
+                              </strong>
+                            </div>
 
-                        <div className="agent-overview-bar">
-                          <span
-                            style={{
-                              width: `${
-                                statistiques.total >
-                                0
-                                  ? (item.total /
-                                      statistiques.total) *
-                                    100
-                                  : 0
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ),
+                            <div className="agent-overview-bar">
+                              <span
+                                style={{
+                                  width: `${
+                                    statistiques.total >
+                                    0
+                                      ? (item.total /
+                                          statistiques.total) *
+                                        100
+                                      : 0
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                    </div>
                   )}
-                </div>
-              </article>
-            </section>
+                </article>
 
-            <section className="agent-overview-grid">
-              <article className="agent-overview-card">
-                <div className="agent-overview-header">
-                  <div>
-                    <span className="agent-overview-label">
-                      Répartition
-                    </span>
+                <article className="agent-overview-card">
+                  <div className="agent-overview-header">
+                    <div>
+                      <span className="agent-overview-label">
+                        Priorités
+                      </span>
 
-                    <h2>
-                      Par département
-                    </h2>
+                      <h2>
+                        Niveau de
+                        priorité
+                      </h2>
+                    </div>
                   </div>
-                </div>
 
-                {statistiques.parDepartement.length === 0 ? (
-                  <div className="agent-overview-empty">
-                    Aucun département renseigné.
-                  </div>
-                ) : (
                   <div className="agent-overview-list">
-                    {statistiques.parDepartement
-                      .slice(0, 6)
-                      .map((item) => (
+                    {statistiques.parPriorite.map(
+                      (item) => (
                         <div
-                          key={item.departement}
+                          key={item.priorite}
                           className="agent-overview-row"
                         >
                           <div className="agent-overview-row-top">
-                            <span>
-                              {item.departement}
+                            <span
+                              className={`priority-badge ${getPriorityClass(
+                                item.priorite,
+                              )}`}
+                            >
+                              {getPriorityLabel(
+                                item.priorite,
+                              )}
                             </span>
 
                             <strong>
@@ -715,17 +763,159 @@ function DashboardAgent() {
                             />
                           </div>
                         </div>
-                      ))}
+                      ),
+                    )}
                   </div>
-                )}
-              </article>
-            </section>
-          </>
-        )}
+                </article>
+              </section>
+
+              <section className="agent-overview-grid">
+                <article className="agent-overview-card">
+                  <div className="agent-overview-header">
+                    <div>
+                      <span className="agent-overview-label">
+                        Répartition
+                      </span>
+
+                      <h2>
+                        Par département
+                      </h2>
+                    </div>
+                  </div>
+
+                  {statistiques.parDepartement
+                    .length === 0 ? (
+                    <div className="agent-overview-empty">
+                      Aucun département
+                      renseigné.
+                    </div>
+                  ) : (
+                    <div className="agent-overview-list">
+                      {statistiques.parDepartement
+                        .slice(0, 6)
+                        .map((item) => (
+                          <div
+                            key={
+                              item.departement
+                            }
+                            className="agent-overview-row"
+                          >
+                            <div className="agent-overview-row-top">
+                              <span>
+                                {
+                                  item.departement
+                                }
+                              </span>
+
+                              <strong>
+                                {item.total}
+                              </strong>
+                            </div>
+
+                            <div className="agent-overview-bar">
+                              <span
+                                style={{
+                                  width: `${
+                                    statistiques.total >
+                                    0
+                                      ? (item.total /
+                                          statistiques.total) *
+                                        100
+                                      : 0
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </article>
+
+                <article className="agent-overview-card agent-ai-overview-card">
+                  <div className="agent-overview-header">
+                    <div>
+                      <span className="agent-overview-label">
+                        Intelligence
+                        artificielle
+                      </span>
+
+                      <h2>
+                        Validation des
+                        classifications
+                      </h2>
+                    </div>
+                  </div>
+
+                  <div className="agent-ai-overview">
+                    <div className="agent-ai-overview-item">
+                      <span>
+                        À valider
+                      </span>
+
+                      <strong>
+                        {
+                          reclamationsIaAValider.length
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="agent-ai-overview-item">
+                      <span>
+                        Validées
+                      </span>
+
+                      <strong>
+                        {
+                          reclamationsIaValidees.length
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="agent-ai-overview-bar">
+                      <span
+                        style={{
+                          width: `${
+                            reclamations.length >
+                            0
+                              ? (
+                                  reclamationsIaValidees.length /
+                                  reclamations.length
+                                ) *
+                                100
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="agent-ai-overview-text">
+                      {reclamations.length >
+                      0 ? (
+                        <>
+                          {Math.round(
+                            (reclamationsIaValidees.length /
+                              reclamations.length) *
+                              100,
+                          )}
+                          % des
+                          classifications IA
+                          sont validées.
+                        </>
+                      ) : (
+                        'Aucune classification disponible.'
+                      )}
+                    </div>
+                  </div>
+                </article>
+              </section>
+            </>
+          )}
 
         {loading && (
           <div className="dashboard-message">
-            Chargement des réclamations et des statistiques...
+            Chargement des réclamations et
+            des statistiques...
           </div>
         )}
 
@@ -743,11 +933,15 @@ function DashboardAgent() {
             <div className="section-heading">
               <div>
                 <h2>
-                  Toutes les réclamations
+                  Toutes les
+                  réclamations
                 </h2>
 
                 <p>
-                  Consultez les réclamations soumises par les citoyens.
+                  Consultez les réclamations
+                  soumises par les citoyens et
+                  contrôlez leur classification
+                  IA.
                 </p>
               </div>
 
@@ -760,6 +954,58 @@ function DashboardAgent() {
                   : ''}
               </span>
             </div>
+
+            {reclamationsIaAValider.length >
+              0 && (
+              <div className="agent-ai-alert">
+                <div className="agent-ai-alert-icon">
+                  <span>!</span>
+                </div>
+
+                <div className="agent-ai-alert-content">
+                  <strong>
+                    {
+                      reclamationsIaAValider.length
+                    }{' '}
+                    classification
+                    {reclamationsIaAValider.length >
+                    1
+                      ? 's'
+                      : ''}{' '}
+                    IA
+                    {reclamationsIaAValider.length >
+                    1
+                      ? ' sont'
+                      : ' est'}{' '}
+                    encore
+                    {reclamationsIaAValider.length >
+                    1
+                      ? ' à'
+                      : ' à'}{' '}
+                    valider.
+                  </strong>
+
+                  <span>
+                    Ouvrez les réclamations
+                    concernées afin de vérifier ou
+                    corriger les propositions de
+                    l'intelligence artificielle.
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() =>
+                    setIaValidationFilter(
+                      'A_VALIDER',
+                    )
+                  }
+                >
+                  Voir les dossiers
+                </button>
+              </div>
+            )}
 
             <div className="filters-card">
               <div className="filters-search">
@@ -871,14 +1117,16 @@ function DashboardAgent() {
                       Tous les services
                     </option>
 
-                    {services.map((service) => (
-                      <option
-                        key={service}
-                        value={service}
-                      >
-                        {service}
-                      </option>
-                    ))}
+                    {services.map(
+                      (service) => (
+                        <option
+                          key={service}
+                          value={service}
+                        >
+                          {service}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
 
@@ -913,12 +1161,42 @@ function DashboardAgent() {
                   </select>
                 </div>
 
+                <div className="filter-group">
+                  <label htmlFor="agent-ia-validation">
+                    Classification IA
+                  </label>
+
+                  <select
+                    id="agent-ia-validation"
+                    value={iaValidationFilter}
+                    onChange={(event) =>
+                      setIaValidationFilter(
+                        event.target.value,
+                      )
+                    }
+                  >
+                    <option value="">
+                      Toutes les classifications
+                    </option>
+
+                    <option value="A_VALIDER">
+                      IA à valider
+                    </option>
+
+                    <option value="VALIDEE">
+                      Classification validée
+                    </option>
+                  </select>
+                </div>
+
                 <div className="filter-actions">
                   <button
                     type="button"
                     className="btn btn-outline"
                     onClick={resetFilters}
-                    disabled={!filtersActive}
+                    disabled={
+                      !filtersActive
+                    }
                   >
                     Réinitialiser
                   </button>
@@ -931,7 +1209,8 @@ function DashboardAgent() {
                   className="btn btn-primary"
                   onClick={handleExportCsv}
                   disabled={
-                    reclamationsFiltrees.length === 0
+                    reclamationsFiltrees.length ===
+                    0
                   }
                 >
                   Exporter CSV
@@ -942,7 +1221,8 @@ function DashboardAgent() {
                   className="btn btn-outline"
                   onClick={handleExportPdf}
                   disabled={
-                    reclamationsFiltrees.length === 0
+                    reclamationsFiltrees.length ===
+                    0
                   }
                 >
                   Exporter PDF
@@ -950,7 +1230,8 @@ function DashboardAgent() {
               </div>
             </div>
 
-            {reclamationsFiltrees.length === 0 ? (
+            {reclamationsFiltrees.length ===
+            0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">
                   <svg
@@ -972,11 +1253,13 @@ function DashboardAgent() {
                 </div>
 
                 <h3>
-                  Aucune réclamation trouvée
+                  Aucune réclamation
+                  trouvée
                 </h3>
 
                 <p>
-                  Aucun dossier ne correspond aux critères de recherche
+                  Aucun dossier ne correspond
+                  aux critères de recherche
                   sélectionnés.
                 </p>
 
@@ -1001,7 +1284,10 @@ function DashboardAgent() {
                     >
                       <article className="agent-reclamation-card">
                         <div className="agent-reclamation-number">
-                          #{reclamation.numeroClassement}
+                          #
+                          {
+                            reclamation.numeroClassement
+                          }
                         </div>
 
                         <div className="agent-reclamation-main">
@@ -1014,7 +1300,9 @@ function DashboardAgent() {
 
                               <p>
                                 Référence #
-                                {reclamation.numeroClassement}
+                                {
+                                  reclamation.numeroClassement
+                                }
                               </p>
                             </div>
 
@@ -1038,12 +1326,24 @@ function DashboardAgent() {
                                   reclamation.priorite,
                                 )}
                               </span>
+
+                              <span
+                                className={getIaValidationClass(
+                                  reclamation.iaValidee,
+                                )}
+                              >
+                                {getIaValidationLabel(
+                                  reclamation.iaValidee,
+                                )}
+                              </span>
                             </div>
                           </div>
 
                           {reclamation.description && (
                             <p className="agent-reclamation-description">
-                              {reclamation.description}
+                              {
+                                reclamation.description
+                              }
                             </p>
                           )}
 
@@ -1051,7 +1351,8 @@ function DashboardAgent() {
                             <span>
                               Citoyen :{' '}
                               <strong>
-                                {reclamation.user?.nom ||
+                                {reclamation.user
+                                  ?.nom ||
                                   'Non renseigné'}
                               </strong>
                             </span>
@@ -1084,11 +1385,11 @@ function DashboardAgent() {
 
                           <div className="agent-reclamation-footer">
                             <span>
-                              {reclamation.fichiers?.length ??
-                                0}{' '}
+                              {reclamation.fichiers
+                                ?.length ?? 0}{' '}
                               fichier
-                              {(reclamation.fichiers?.length ??
-                                0) > 1
+                              {(reclamation.fichiers
+                                ?.length ?? 0) > 1
                                 ? 's'
                                 : ''}
                             </span>

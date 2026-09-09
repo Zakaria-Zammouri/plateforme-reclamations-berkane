@@ -73,7 +73,9 @@ export class ReclamationsService {
           errorText,
         )
 
-        console.log('======================================')
+        console.log(
+          '======================================',
+        )
 
         return null
       }
@@ -96,7 +98,9 @@ export class ReclamationsService {
           '❌ Réponse IA non JSON.',
         )
 
-        console.log('======================================')
+        console.log(
+          '======================================',
+        )
 
         return null
       }
@@ -121,7 +125,9 @@ export class ReclamationsService {
           '❌ Réponse IA invalide.',
         )
 
-        console.log('======================================')
+        console.log(
+          '======================================',
+        )
 
         return null
       }
@@ -143,7 +149,9 @@ export class ReclamationsService {
           data.priorite,
         )
 
-        console.log('======================================')
+        console.log(
+          '======================================',
+        )
 
         return null
       }
@@ -183,7 +191,9 @@ export class ReclamationsService {
         resultat,
       )
 
-      console.log('======================================')
+      console.log(
+        '======================================',
+      )
 
       return resultat
     } catch (error) {
@@ -193,7 +203,9 @@ export class ReclamationsService {
 
       console.error(error)
 
-      console.log('======================================')
+      console.log(
+        '======================================',
+      )
 
       return null
     }
@@ -601,6 +613,20 @@ export class ReclamationsService {
               : null,
 
           // ===================================
+          // Une réclamation avec analyse IA
+          // doit être validée humainement.
+          //
+          // Une réclamation sans analyse IA
+          // ne doit PAS être considérée
+          // comme "à valider".
+          // ===================================
+
+          iaValidee:
+            analyseIA
+              ? false
+              : true,
+
+          // ===================================
           // Autres informations
           // ===================================
 
@@ -635,25 +661,36 @@ export class ReclamationsService {
       })
 
     console.log(
-      '✅ Réclamation créée avec analyse IA :',
+      '✅ Réclamation créée :',
       {
         id: reclamation.id,
+
         numeroClassement:
           reclamation.numeroClassement,
+
         priorite:
           reclamation.priorite,
+
         categorieIA:
           reclamation.categorieIA,
+
         departementIA:
           reclamation.departementIA,
+
         serviceIA:
           reclamation.serviceIA,
+
         prioriteIA:
           reclamation.prioriteIA,
+
         confianceIA:
           reclamation.confianceIA,
+
         analyseIAAt:
           reclamation.analyseIAAt,
+
+        iaValidee:
+          reclamation.iaValidee,
       },
     )
 
@@ -673,6 +710,14 @@ export class ReclamationsService {
 
         nouveauStatut:
           reclamation.statut,
+
+        actionTypee:
+          'CREATION',
+
+        detail:
+          analyseIA
+            ? 'Création de la réclamation avec analyse IA. Classification en attente de validation humaine.'
+            : 'Création de la réclamation. Aucune analyse IA disponible.',
       },
     })
 
@@ -742,6 +787,300 @@ export class ReclamationsService {
   }
 
   // =========================================
+  // VALIDATION / CORRECTION ANALYSE IA
+  // ADMIN / AGENT
+  // =========================================
+
+  async validerAnalyseIA(
+    id: number,
+    dto: UpdateReclamationDto,
+    userId: number,
+  ) {
+    const reclamation =
+      await this.prisma.reclamation.findUnique({
+        where: {
+          id,
+        },
+      })
+
+    if (!reclamation) {
+      throw new NotFoundException(
+        'Réclamation introuvable.',
+      )
+    }
+
+    // =======================================
+    // Vérification de l'existence de l'analyse
+    // IA
+    // =======================================
+
+    const analyseIAExiste =
+      Boolean(
+        reclamation.analyseIAAt ||
+        reclamation.categorieIA ||
+        reclamation.departementIA ||
+        reclamation.serviceIA ||
+        reclamation.prioriteIA ||
+        reclamation.confianceIA !== null,
+      )
+
+    if (!analyseIAExiste) {
+      throw new ForbiddenException(
+        'Cette réclamation ne possède aucune analyse IA à valider.',
+      )
+    }
+
+    // =======================================
+    // Éviter une validation inutile
+    // =======================================
+
+    if (reclamation.iaValidee) {
+      throw new ForbiddenException(
+        'La classification IA de cette réclamation est déjà validée.',
+      )
+    }
+
+    // =======================================
+    // Vérification des valeurs envoyées
+    // =======================================
+
+    const prioritesAutorisees = [
+      'BASSE',
+      'NORMALE',
+      'HAUTE',
+      'URGENTE',
+    ] as const
+
+    let prioriteFinale =
+      reclamation.priorite
+
+    if (dto.priorite !== undefined) {
+      const priorite =
+        dto.priorite
+          .trim()
+          .toUpperCase()
+
+      if (
+        !prioritesAutorisees.includes(
+          priorite as (typeof prioritesAutorisees)[number],
+        )
+      ) {
+        throw new ForbiddenException(
+          'Priorité invalide.',
+        )
+      }
+
+      prioriteFinale =
+        priorite
+    }
+
+    const departementFinal =
+      dto.departement !== undefined
+        ? dto.departement.trim() ||
+          null
+        : reclamation.departement
+
+    const serviceFinal =
+      dto.service !== undefined
+        ? dto.service.trim() ||
+          null
+        : reclamation.service
+
+    // =======================================
+    // Les valeurs finales doivent être
+    // renseignées pour valider la classification
+    // =======================================
+
+    if (!departementFinal) {
+      throw new ForbiddenException(
+        'Le département final est obligatoire pour valider la classification IA.',
+      )
+    }
+
+    if (!serviceFinal) {
+      throw new ForbiddenException(
+        'Le service final est obligatoire pour valider la classification IA.',
+      )
+    }
+
+    // =======================================
+    // Mise à jour des valeurs finales
+    // + classification IA validée
+    // =======================================
+
+    const updatedReclamation =
+      await this.prisma.reclamation.update({
+        where: {
+          id,
+        },
+
+        data: {
+          departement:
+            departementFinal,
+
+          service:
+            serviceFinal,
+
+          priorite:
+            prioriteFinale,
+
+          iaValidee:
+            true,
+        },
+      })
+
+    // =======================================
+    // Historique de validation/correction IA
+    // =======================================
+
+    const detailValidationIA =
+      [
+        'Classification IA validée.',
+        `Département final : ${
+          updatedReclamation.departement ||
+          'Non renseigné'
+        }.`,
+        `Service final : ${
+          updatedReclamation.service ||
+          'Non renseigné'
+        }.`,
+        `Priorité finale : ${
+          updatedReclamation.priorite ||
+          'Non renseignée'
+        }.`,
+        `Proposition IA - catégorie : ${
+          reclamation.categorieIA ||
+          'Non renseignée'
+        }.`,
+        `Proposition IA - département : ${
+          reclamation.departementIA ||
+          'Non renseigné'
+        }.`,
+        `Proposition IA - service : ${
+          reclamation.serviceIA ||
+          'Non renseigné'
+        }.`,
+        `Proposition IA - priorité : ${
+          reclamation.prioriteIA ||
+          'Non renseignée'
+        }.`,
+        `Confiance IA : ${
+          reclamation.confianceIA !==
+          null
+            ? `${Math.round(
+                reclamation.confianceIA *
+                  100,
+              )}%`
+            : 'Non renseignée'
+        }.`,
+      ].join(' ')
+
+    await this.prisma.historiqueReclamation.create({
+      data: {
+        reclamationId:
+          id,
+
+        userId,
+
+        ancienStatut:
+          reclamation.statut,
+
+        nouveauStatut:
+          updatedReclamation.statut,
+
+        actionTypee:
+          'VALIDATION_IA',
+
+        detail:
+          detailValidationIA,
+      },
+    })
+
+    // =======================================
+    // Log de validation/correction
+    // =======================================
+
+    console.log(
+      '🧑‍💼 VALIDATION ANALYSE IA',
+    )
+
+    console.log({
+      reclamationId:
+        id,
+
+      userId,
+
+      ancienneValeur: {
+        departement:
+          reclamation.departement,
+
+        service:
+          reclamation.service,
+
+        priorite:
+          reclamation.priorite,
+
+        iaValidee:
+          reclamation.iaValidee,
+      },
+
+      nouvelleValeur: {
+        departement:
+          updatedReclamation.departement,
+
+        service:
+          updatedReclamation.service,
+
+        priorite:
+          updatedReclamation.priorite,
+
+        iaValidee:
+          updatedReclamation.iaValidee,
+      },
+
+      propositionIA: {
+        categorie:
+          reclamation.categorieIA,
+
+        departement:
+          reclamation.departementIA,
+
+        service:
+          reclamation.serviceIA,
+
+        priorite:
+          reclamation.prioriteIA,
+
+        confiance:
+          reclamation.confianceIA,
+
+        analyseAt:
+          reclamation.analyseIAAt,
+      },
+    })
+
+    // =======================================
+    // Notification citoyen
+    // =======================================
+
+    if (reclamation.userId) {
+      await this.notificationsService.create(
+        reclamation.userId,
+
+        'Analyse de votre réclamation',
+
+        `La classification de votre réclamation n°${reclamation.numeroClassement} a été vérifiée par un agent de la commune.`,
+
+        'INFO',
+
+        reclamation.id,
+      )
+    }
+
+    return updatedReclamation
+  }
+
+  // =========================================
   // CHANGEMENT DE STATUT
   // =========================================
 
@@ -804,6 +1143,10 @@ export class ReclamationsService {
         },
       })
 
+    // =======================================
+    // Historique du changement de statut
+    // =======================================
+
     await this.prisma.historiqueReclamation.create({
       data: {
         reclamationId:
@@ -815,8 +1158,18 @@ export class ReclamationsService {
           reclamation.statut,
 
         nouveauStatut,
+
+        actionTypee:
+          'STATUT',
+
+        detail:
+          `Changement de statut : ${reclamation.statut} → ${nouveauStatut}.`,
       },
     })
+
+    // =======================================
+    // Notification citoyen
+    // =======================================
 
     if (reclamation.userId) {
       let titreNotification =

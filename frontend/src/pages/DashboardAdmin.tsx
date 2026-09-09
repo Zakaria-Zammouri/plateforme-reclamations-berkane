@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import '../App.css'
@@ -23,6 +23,14 @@ type Reclamation = {
   departement: string | null
   service: string | null
   createdAt: string
+  updatedAt: string
+  iaValidee: boolean
+  categorieIA: string | null
+  departementIA: string | null
+  serviceIA: string | null
+  prioriteIA: string | null
+  confianceIA: number | null
+  analyseIAAt: string | null
   user?: User
 }
 
@@ -48,6 +56,7 @@ type Statistiques = {
 
 function DashboardAdmin() {
   const navigate = useNavigate()
+  const reclamationsSectionRef = useRef<HTMLElement | null>(null)
 
   const [user, setUser] = useState<User | null>(null)
 
@@ -62,7 +71,10 @@ function DashboardAdmin() {
   const [statutFilter, setStatutFilter] = useState('')
   const [prioriteFilter, setPrioriteFilter] = useState('')
   const [serviceFilter, setServiceFilter] = useState('')
-  const [departementFilter, setDepartementFilter] = useState('')
+  const [departementFilter, setDepartementFilter] =
+    useState('')
+  const [iaValidationFilter, setIaValidationFilter] =
+    useState('')
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -96,28 +108,30 @@ function DashboardAdmin() {
 
     async function loadDashboard() {
       try {
-        const [reclamationsResponse, statistiquesResponse] =
-          await Promise.all([
-            fetch(
-              'http://localhost:3000/reclamations',
-              {
-                method: 'GET',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
+        const [
+          reclamationsResponse,
+          statistiquesResponse,
+        ] = await Promise.all([
+          fetch(
+            'http://localhost:3000/reclamations',
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
               },
-            ),
+            },
+          ),
 
-            fetch(
-              'http://localhost:3000/reclamations/statistiques',
-              {
-                method: 'GET',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
+          fetch(
+            'http://localhost:3000/reclamations/statistiques',
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
               },
-            ),
-          ])
+            },
+          ),
+        ])
 
         if (
           reclamationsResponse.status === 401 ||
@@ -162,27 +176,81 @@ function DashboardAdmin() {
             ? reclamationsData
             : reclamationsData.data ?? []
 
-        const list: Reclamation[] = listData.map(
-          (reclamation) => ({
+        const list: Reclamation[] =
+          listData.map((reclamation) => ({
             ...reclamation,
+
             priorite:
-              reclamation.priorite || 'NORMALE',
-          }),
-        )
+              reclamation.priorite ||
+              'NORMALE',
+
+            iaValidee:
+              reclamation.iaValidee === true,
+
+            categorieIA:
+              reclamation.categorieIA ??
+              null,
+
+            departementIA:
+              reclamation.departementIA ??
+              null,
+
+            serviceIA:
+              reclamation.serviceIA ??
+              null,
+
+            prioriteIA:
+              reclamation.prioriteIA ??
+              null,
+
+            confianceIA:
+              reclamation.confianceIA ??
+              null,
+
+            analyseIAAt:
+              reclamation.analyseIAAt ??
+              null,
+          }))
 
         const statsData =
-          statistiquesData.data ?? statistiquesData
+          statistiquesData.data ??
+          statistiquesData
 
         const stats: Statistiques = {
           total: statsData.total ?? 0,
-          enAttente: statsData.enAttente ?? 0,
-          enCours: statsData.enCours ?? 0,
-          traitees: statsData.traitees ?? 0,
-          rejetees: statsData.rejetees ?? 0,
-          parService: statsData.parService ?? [],
+
+          enAttente:
+            statsData.enAttente ?? 0,
+
+          enCours:
+            statsData.enCours ?? 0,
+
+          traitees:
+            statsData.traitees ?? 0,
+
+          rejetees:
+            statsData.rejetees ?? 0,
+
+          parService:
+            Array.isArray(
+              statsData.parService,
+            )
+              ? statsData.parService
+              : [],
+
           parDepartement:
-            statsData.parDepartement ?? [],
-          parPriorite: statsData.parPriorite ?? [],
+            Array.isArray(
+              statsData.parDepartement,
+            )
+              ? statsData.parDepartement
+              : [],
+
+          parPriorite:
+            Array.isArray(
+              statsData.parPriorite,
+            )
+              ? statsData.parPriorite
+              : [],
         }
 
         setReclamations(list)
@@ -211,12 +279,16 @@ function DashboardAdmin() {
     switch (statut) {
       case 'EN_ATTENTE':
         return 'En attente'
+
       case 'EN_COURS':
         return 'En cours'
+
       case 'TRAITEE':
         return 'Traitée'
+
       case 'REJETEE':
         return 'Rejetée'
+
       default:
         return statut
     }
@@ -226,12 +298,16 @@ function DashboardAdmin() {
     switch (statut) {
       case 'EN_ATTENTE':
         return 'status-pending'
+
       case 'EN_COURS':
         return 'status-progress'
+
       case 'TRAITEE':
         return 'status-done'
+
       case 'REJETEE':
         return 'status-rejected'
+
       default:
         return 'status-default'
     }
@@ -241,12 +317,16 @@ function DashboardAdmin() {
     switch (priorite) {
       case 'BASSE':
         return 'Basse'
+
       case 'NORMALE':
         return 'Normale'
+
       case 'HAUTE':
         return 'Haute'
+
       case 'URGENTE':
         return 'Urgente'
+
       default:
         return 'Normale'
     }
@@ -256,19 +336,40 @@ function DashboardAdmin() {
     switch (priorite) {
       case 'BASSE':
         return 'priority-low'
+
       case 'NORMALE':
         return 'priority-normal'
+
       case 'HAUTE':
         return 'priority-high'
+
       case 'URGENTE':
         return 'priority-urgent'
+
       default:
         return 'priority-normal'
     }
   }
 
+  function iaValidationLabel(
+    iaValidee: boolean,
+  ) {
+    return iaValidee
+      ? 'Classification validée'
+      : 'IA à valider'
+  }
+
+  function iaValidationClass(
+    iaValidee: boolean,
+  ) {
+    return iaValidee
+      ? 'agent-ai-badge agent-ai-badge-valid'
+      : 'agent-ai-badge agent-ai-badge-pending'
+  }
+
   const tauxTraitement =
-    statistiques && statistiques.total > 0
+    statistiques &&
+    statistiques.total > 0
       ? Math.round(
           ((statistiques.traitees +
             statistiques.rejetees) /
@@ -296,7 +397,9 @@ function DashboardAdmin() {
     return Array.from(
       new Set(
         reclamations
-          .map((item) => item.departement?.trim())
+          .map((item) =>
+            item.departement?.trim(),
+          )
           .filter(
             (value): value is string =>
               Boolean(value),
@@ -307,75 +410,128 @@ function DashboardAdmin() {
     )
   }, [reclamations])
 
+  const reclamationsIaAValider = useMemo(() => {
+    return reclamations.filter(
+      (reclamation) =>
+        !reclamation.iaValidee,
+    )
+  }, [reclamations])
+
+  const reclamationsIaValidees = useMemo(() => {
+    return reclamations.filter(
+      (reclamation) =>
+        reclamation.iaValidee,
+    )
+  }, [reclamations])
+
+  const pourcentageIaValidee =
+    reclamations.length > 0
+      ? Math.round(
+          (reclamationsIaValidees.length /
+            reclamations.length) *
+            100,
+        )
+      : 0
+
   const reclamationsFiltrees = useMemo(() => {
-    const normalizedSearch = search
-      .trim()
-      .toLowerCase()
+    const normalizedSearch =
+      search.trim().toLowerCase()
 
-    return reclamations.filter((reclamation) => {
-      const normalizedPriority = (
-        reclamation.priorite || 'NORMALE'
-      ).toLowerCase()
-
-      const normalizedPriorityLabel =
-        priorityLabel(
-          reclamation.priorite || 'NORMALE',
+    return reclamations.filter(
+      (reclamation) => {
+        const normalizedPriority = (
+          reclamation.priorite ||
+          'NORMALE'
         ).toLowerCase()
 
-      const matchesSearch =
-        !normalizedSearch ||
-        String(reclamation.numeroClassement)
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.titre || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.user?.nom || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.user?.email || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.service || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        (reclamation.departement || '')
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        normalizedPriority.includes(
-          normalizedSearch,
-        ) ||
-        normalizedPriorityLabel.includes(
-          normalizedSearch,
+        const normalizedPriorityLabel =
+          priorityLabel(
+            reclamation.priorite ||
+              'NORMALE',
+          ).toLowerCase()
+
+        const normalizedIaStatus =
+          iaValidationLabel(
+            reclamation.iaValidee,
+          ).toLowerCase()
+
+        const matchesSearch =
+          !normalizedSearch ||
+          String(
+            reclamation.numeroClassement,
+          )
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.titre || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.user?.nom || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.user?.email || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.service || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (reclamation.departement || '')
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          normalizedPriority.includes(
+            normalizedSearch,
+          ) ||
+          normalizedPriorityLabel.includes(
+            normalizedSearch,
+          ) ||
+          normalizedIaStatus.includes(
+            normalizedSearch,
+          )
+
+        const matchesStatus =
+          !statutFilter ||
+          reclamation.statut ===
+            statutFilter
+
+        const matchesPriority =
+          !prioriteFilter ||
+          (reclamation.priorite ||
+            'NORMALE') ===
+            prioriteFilter
+
+        const matchesService =
+          !serviceFilter ||
+          (
+            reclamation.service ||
+            ''
+          ).trim() === serviceFilter
+
+        const matchesDepartement =
+          !departementFilter ||
+          (
+            reclamation.departement ||
+            ''
+          ).trim() ===
+            departementFilter
+
+        const matchesIaValidation =
+          !iaValidationFilter ||
+          (
+            iaValidationFilter ===
+            'A_VALIDER'
+              ? !reclamation.iaValidee
+              : reclamation.iaValidee
+          )
+
+        return (
+          matchesSearch &&
+          matchesStatus &&
+          matchesPriority &&
+          matchesService &&
+          matchesDepartement &&
+          matchesIaValidation
         )
-
-      const matchesStatus =
-        !statutFilter ||
-        reclamation.statut === statutFilter
-
-      const matchesPriority =
-        !prioriteFilter ||
-        (reclamation.priorite || 'NORMALE') ===
-          prioriteFilter
-
-      const matchesService =
-        !serviceFilter ||
-        (reclamation.service || '').trim() ===
-          serviceFilter
-
-      const matchesDepartement =
-        !departementFilter ||
-        (reclamation.departement || '').trim() ===
-          departementFilter
-
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesPriority &&
-        matchesService &&
-        matchesDepartement
-      )
-    })
+      },
+    )
   }, [
     reclamations,
     search,
@@ -383,6 +539,7 @@ function DashboardAdmin() {
     prioriteFilter,
     serviceFilter,
     departementFilter,
+    iaValidationFilter,
   ])
 
   function resetFilters() {
@@ -391,6 +548,7 @@ function DashboardAdmin() {
     setPrioriteFilter('')
     setServiceFilter('')
     setDepartementFilter('')
+    setIaValidationFilter('')
   }
 
   function handleExportCsv() {
@@ -406,12 +564,24 @@ function DashboardAdmin() {
     )
   }
 
+  function showIaAValider() {
+    setIaValidationFilter('A_VALIDER')
+
+    window.setTimeout(() => {
+      reclamationsSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 50)
+  }
+
   const filtersActive =
     search.trim() !== '' ||
     statutFilter !== '' ||
     prioriteFilter !== '' ||
     serviceFilter !== '' ||
-    departementFilter !== ''
+    departementFilter !== '' ||
+    iaValidationFilter !== ''
 
   const prioriteStats = useMemo(() => {
     const defaults = [
@@ -439,10 +609,12 @@ function DashboardAdmin() {
 
     return defaults.map((item) => ({
       priorite: item.priorite,
+
       total:
         statistiques.parPriorite.find(
           (stat) =>
-            stat.priorite === item.priorite,
+            stat.priorite ===
+            item.priorite,
         )?.total ?? 0,
     }))
   }, [statistiques])
@@ -458,12 +630,14 @@ function DashboardAdmin() {
 
             <h1>
               Bonjour
-              {user?.nom ? ` ${user.nom}` : ''}
+              {user?.nom
+                ? ` ${user.nom}`
+                : ''}
             </h1>
 
             <p>
-              Administrez les réclamations et la
-              plateforme SAWTI.
+              Administrez les réclamations
+              et la plateforme SAWTI.
             </p>
           </div>
 
@@ -556,6 +730,20 @@ function DashboardAdmin() {
                     dossiers
                   </small>
                 </article>
+
+                <article className="admin-stat-card">
+                  <span>IA à valider</span>
+
+                  <strong>
+                    {
+                      reclamationsIaAValider.length
+                    }
+                  </strong>
+
+                  <small>
+                    classifications
+                  </small>
+                </article>
               </section>
 
               <section className="admin-overview-grid">
@@ -609,7 +797,9 @@ function DashboardAdmin() {
                         </span>
 
                         <strong>
-                          {statistiques.enCours}
+                          {
+                            statistiques.enCours
+                          }
                         </strong>
                       </div>
 
@@ -636,7 +826,9 @@ function DashboardAdmin() {
                         </span>
 
                         <strong>
-                          {statistiques.traitees}
+                          {
+                            statistiques.traitees
+                          }
                         </strong>
                       </div>
 
@@ -663,7 +855,9 @@ function DashboardAdmin() {
                         </span>
 
                         <strong>
-                          {statistiques.rejetees}
+                          {
+                            statistiques.rejetees
+                          }
                         </strong>
                       </div>
 
@@ -748,8 +942,8 @@ function DashboardAdmin() {
                     </div>
                   </div>
 
-                  {statistiques.parService.length ===
-                  0 ? (
+                  {statistiques.parService
+                    .length === 0 ? (
                     <div className="admin-overview-empty">
                       Aucun service
                       renseigné.
@@ -928,7 +1122,8 @@ function DashboardAdmin() {
                       style={
                         {
                           '--treatment-value': `${
-                            statistiques.total > 0
+                            statistiques.total >
+                            0
                               ? Math.round(
                                   ((prioriteStats.find(
                                     (item) =>
@@ -975,13 +1170,136 @@ function DashboardAdmin() {
                   </div>
                 </article>
               </section>
+
+              <section className="admin-overview-grid">
+                <article className="admin-overview-card">
+                  <div className="admin-overview-header">
+                    <div>
+                      <span className="admin-overview-label">
+                        Intelligence artificielle
+                      </span>
+
+                      <h2>
+                        Validation des classifications
+                      </h2>
+                    </div>
+                  </div>
+
+                  <div className="admin-ai-overview">
+                    <div className="admin-ai-overview-stats">
+                      <div className="admin-ai-overview-item">
+                        <span>
+                          À valider
+                        </span>
+
+                        <strong>
+                          {
+                            reclamationsIaAValider.length
+                          }
+                        </strong>
+                      </div>
+
+                      <div className="admin-ai-overview-item">
+                        <span>
+                          Validées
+                        </span>
+
+                        <strong>
+                          {
+                            reclamationsIaValidees.length
+                          }
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="admin-ai-overview-bar">
+                      <span
+                        style={{
+                          width: `${pourcentageIaValidee}%`,
+                        }}
+                      />
+                    </div>
+
+                    <p className="admin-ai-overview-text">
+                      {reclamations.length >
+                      0 ? (
+                        <>
+                          {pourcentageIaValidee}%
+                          des
+                          classifications IA
+                          sont validées.
+                        </>
+                      ) : (
+                        'Aucune classification IA disponible.'
+                      )}
+                    </p>
+
+                    {reclamationsIaAValider.length >
+                      0 && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={showIaAValider}
+                      >
+                        Voir les
+                        classifications à
+                        valider
+                      </button>
+                    )}
+                  </div>
+                </article>
+
+                <article className="admin-overview-card">
+                  <div className="admin-overview-header">
+                    <div>
+                      <span className="admin-overview-label">
+                        Contrôle
+                      </span>
+
+                      <h2>
+                        État de la classification IA
+                      </h2>
+                    </div>
+                  </div>
+
+                  <div className="admin-ai-status-list">
+                    <div className="admin-ai-status-row">
+                      <span
+                        className="agent-ai-badge agent-ai-badge-pending"
+                      >
+                        IA à valider
+                      </span>
+
+                      <strong>
+                        {
+                          reclamationsIaAValider.length
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="admin-ai-status-row">
+                      <span
+                        className="agent-ai-badge agent-ai-badge-valid"
+                      >
+                        Classification validée
+                      </span>
+
+                      <strong>
+                        {
+                          reclamationsIaValidees.length
+                        }
+                      </strong>
+                    </div>
+                  </div>
+                </article>
+              </section>
             </>
           )}
 
         {loading && (
           <div className="dashboard-message">
-            Chargement des réclamations et des
-            statistiques...
+            Chargement des réclamations
+            et des statistiques...
           </div>
         )}
 
@@ -995,7 +1313,11 @@ function DashboardAdmin() {
         )}
 
         {!loading && !error && (
-          <section className="admin-reclamations-section">
+          <section
+        ref={reclamationsSectionRef}
+        id="admin-reclamations-section"
+        className="admin-reclamations-section"
+      >
             <div className="section-heading">
               <div>
                 <h2>
@@ -1018,6 +1340,48 @@ function DashboardAdmin() {
               </span>
             </div>
 
+            {reclamationsIaAValider.length >
+              0 && (
+              <div className="agent-ai-alert admin-ai-alert">
+                <div className="agent-ai-alert-icon">
+                  <span>!</span>
+                </div>
+
+                <div className="agent-ai-alert-content">
+                  <strong>
+                    {
+                      reclamationsIaAValider.length
+                    }{' '}
+                    classification
+                    {reclamationsIaAValider.length >
+                    1
+                      ? 's'
+                      : ''}{' '}
+                    IA
+                    {reclamationsIaAValider.length >
+                    1
+                      ? ' sont'
+                      : ' est'}{' '}
+                    encore à valider.
+                  </strong>
+
+                  <span>
+                    Vérifiez les propositions de
+                    l'intelligence artificielle avant
+                    leur validation définitive.
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={showIaAValider}
+                >
+                  Voir les dossiers
+                </button>
+              </div>
+            )}
+
             <div className="filters-card">
               <div className="filters-search">
                 <label htmlFor="admin-search">
@@ -1033,7 +1397,7 @@ function DashboardAdmin() {
                       event.target.value,
                     )
                   }
-                  placeholder="Référence, titre, citoyen, service..."
+                  placeholder="Référence, titre, citoyen, service, priorité, IA..."
                 />
               </div>
 
@@ -1174,6 +1538,34 @@ function DashboardAdmin() {
                   </select>
                 </div>
 
+                <div className="filter-group">
+                  <label htmlFor="admin-ia-validation">
+                    Classification IA
+                  </label>
+
+                  <select
+                    id="admin-ia-validation"
+                    value={iaValidationFilter}
+                    onChange={(event) =>
+                      setIaValidationFilter(
+                        event.target.value,
+                      )
+                    }
+                  >
+                    <option value="">
+                      Toutes les classifications
+                    </option>
+
+                    <option value="A_VALIDER">
+                      IA à valider
+                    </option>
+
+                    <option value="VALIDEE">
+                      Classification validée
+                    </option>
+                  </select>
+                </div>
+
                 <div className="filter-actions">
                   <button
                     type="button"
@@ -1230,6 +1622,7 @@ function DashboardAdmin() {
                       cy="11"
                       r="6"
                     />
+
                     <path d="m16 16 4 4" />
                   </svg>
                 </div>
@@ -1273,15 +1666,25 @@ function DashboardAdmin() {
                         Département
                       </th>
 
-                      <th>Service</th>
+                      <th>
+                        Service
+                      </th>
 
                       <th>
                         Priorité
                       </th>
 
-                      <th>Statut</th>
+                      <th>
+                        Classification IA
+                      </th>
 
-                      <th>Action</th>
+                      <th>
+                        Statut
+                      </th>
+
+                      <th>
+                        Action
+                      </th>
                     </tr>
                   </thead>
 
@@ -1303,7 +1706,9 @@ function DashboardAdmin() {
                           </td>
 
                           <td>
-                            {reclamation.titre ||
+                            {
+                              reclamation.titre
+                            ||
                               'Sans titre'}
                           </td>
 
@@ -1335,6 +1740,18 @@ function DashboardAdmin() {
                               {priorityLabel(
                                 reclamation.priorite ||
                                   'NORMALE',
+                              )}
+                            </span>
+                          </td>
+
+                          <td>
+                            <span
+                              className={iaValidationClass(
+                                reclamation.iaValidee,
+                              )}
+                            >
+                              {iaValidationLabel(
+                                reclamation.iaValidee,
                               )}
                             </span>
                           </td>
